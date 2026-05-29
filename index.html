@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kubernetes 101 — From Zero to Deploy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-elev: #161b22;
+    --bg-soft: #1c232c;
+    --border: #30363d;
+    --border-soft: #21262d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-faint: #6e7681;
+    --accent: #79c0ff;      /* k8s-ish blue */
+    --accent-2: #ffa657;    /* orange */
+    --accent-3: #7ee787;    /* green */
+    --accent-4: #ff7b72;    /* red */
+    --accent-5: #d2a8ff;    /* purple */
+    --yellow: #e3b341;
+    --serif: "Fraunces", Georgia, serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    --sans: "Inter", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(121, 192, 255, 0.04), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(210, 168, 255, 0.04), transparent 45%);
+    min-height: 100vh;
+  }
+
+  /* ===== LAYOUT ===== */
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  aside {
+    border-right: 1px solid var(--border);
+    background: rgba(13, 17, 23, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 32px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .brand {
+    padding: 0 28px 28px;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 18px;
+  }
+  .brand-title {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 0;
+  }
+  .brand-title em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 400;
+  }
+  .brand-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  nav ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: nav;
+  }
+  nav li {
+    counter-increment: nav;
+  }
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 28px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 2px solid transparent;
+    transition: all 0.15s ease;
+  }
+  nav a::before {
+    content: counter(nav, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+  }
+  nav a:hover {
+    color: var(--text);
+    background: var(--bg-elev);
+  }
+  nav a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(121, 192, 255, 0.06);
+  }
+  nav a.active::before { color: var(--accent); }
+
+  main {
+    padding: 64px 80px 120px;
+    max-width: 920px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ===== SECTIONS ===== */
+  section.lesson { display: none; }
+  section.lesson.visible { display: block; animation: fadeIn 0.3s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .lesson-header {
+    padding-bottom: 28px;
+    margin-bottom: 36px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .lesson-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 52px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    margin: 0 0 14px;
+  }
+  h1 em { font-style: italic; color: var(--accent); font-weight: 400; }
+  .lesson-tagline {
+    font-family: var(--serif);
+    font-size: 19px;
+    color: var(--text-dim);
+    font-style: italic;
+    line-height: 1.4;
+    max-width: 640px;
+    margin: 0;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+    margin: 56px 0 16px;
+    line-height: 1.2;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 32px 0 12px;
+    color: var(--text);
+    letter-spacing: -0.005em;
+  }
+
+  p { margin: 0 0 16px; color: #c9d1d9; }
+  p strong { color: var(--text); font-weight: 600; }
+  p em { color: var(--accent-2); font-style: italic; }
+
+  ul, ol { padding-left: 22px; margin: 0 0 16px; color: #c9d1d9; }
+  li { margin-bottom: 6px; }
+  li code { font-size: 13px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    background: var(--bg-soft);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-soft);
+    color: var(--accent);
+  }
+
+  /* ===== CODE BLOCKS ===== */
+  .code {
+    position: relative;
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 18px 0 24px;
+    overflow: hidden;
+  }
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .copy-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--accent-3); border-color: var(--accent-3); }
+  .copy-btn.copied { color: var(--accent-3); border-color: var(--accent-3); }
+
+  pre {
+    margin: 0;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  pre .c { color: var(--text-faint); font-style: italic; }      /* comment */
+  pre .k { color: var(--accent-4); }                            /* keyword */
+  pre .s { color: var(--accent-3); }                            /* string */
+  pre .n { color: var(--accent-2); }                            /* number/value */
+  pre .p { color: var(--accent-5); }                            /* prompt $ */
+  pre .y { color: var(--yellow); }                              /* yaml key */
+  pre .b { color: var(--accent); }                              /* builtin/highlight */
+  pre .o { color: #c9d1d9; }                                    /* operator */
+
+  /* ===== CARDS / CALLOUTS ===== */
+  .callout {
+    display: flex;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+  }
+  .callout-icon {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    padding-top: 1px;
+    flex-shrink: 0;
+  }
+  .callout-body { flex: 1; font-size: 14.5px; line-height: 1.6; }
+  .callout-body p:last-child { margin-bottom: 0; }
+  .callout.tip { border-left: 3px solid var(--accent-3); }
+  .callout.tip .callout-icon { color: var(--accent-3); }
+  .callout.warn { border-left: 3px solid var(--yellow); }
+  .callout.warn .callout-icon { color: var(--yellow); }
+  .callout.info { border-left: 3px solid var(--accent); }
+  .callout.info .callout-icon { color: var(--accent); }
+
+  /* ===== DIAGRAMS ===== */
+  .diagram {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    margin: 24px 0 28px;
+    overflow-x: auto;
+  }
+  .diagram svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  .diagram-caption {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    margin-top: 14px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* ===== EXERCISE ===== */
+  .exercise {
+    margin: 32px 0;
+    border: 1px solid var(--accent-2);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 166, 87, 0.04), transparent 60%);
+    overflow: hidden;
+  }
+  .exercise-head {
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(255, 166, 87, 0.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .exercise-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--accent-2);
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .exercise-title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--text);
+  }
+  .exercise-body { padding: 20px 22px 4px; }
+  .exercise-body p { font-size: 15px; }
+  .reveal-btn {
+    background: transparent;
+    border: 1px solid var(--accent-2);
+    color: var(--accent-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 8px 22px 22px;
+    transition: all 0.15s;
+  }
+  .reveal-btn:hover { background: var(--accent-2); color: var(--bg); }
+  .solution { display: none; padding: 0 22px 22px; }
+  .solution.visible { display: block; }
+  .solution-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent-3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* ===== NAV BUTTONS ===== */
+  .lesson-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 72px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .nav-btn {
+    flex: 1;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    font-family: var(--sans);
+    transition: all 0.15s;
+  }
+  .nav-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .nav-btn.next { text-align: right; }
+  .nav-btn-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .nav-btn-title { font-family: var(--serif); font-style: italic; font-size: 17px; }
+
+  /* ===== PROGRESS ===== */
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 280px; right: 0;
+    height: 2px;
+    background: transparent;
+    z-index: 100;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .terminal-prompt::before {
+    content: "$ ";
+    color: var(--accent-5);
+    font-weight: 700;
+  }
+
+  /* table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+  td code { font-size: 12.5px; }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    aside {
+      position: static; height: auto; padding: 20px 0;
+      border-right: none; border-bottom: 1px solid var(--border);
+    }
+    main { padding: 40px 24px 80px; }
+    .progress-bar { left: 0; }
+    h1 { font-size: 36px; }
+  }
+
+  /* ===== MARKDOWN BODY ===== */
+  .md-body pre {
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 18px 0 24px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  .md-body pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  .md-body blockquote {
+    border-left: 3px solid var(--accent);
+    margin: 20px 0;
+    padding: 12px 18px;
+    background: var(--bg-elev);
+    border-radius: 0 8px 8px 0;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .md-body blockquote p { margin-bottom: 0; }
+  .md-body hr { border: none; border-top: 1px solid var(--border-soft); margin: 32px 0; }
+  .md-body h2 { margin-top: 48px; }
+  .md-body h3 { margin-top: 28px; }
+
+  /* ===== SOURCE FILES ===== */
+  .source-files {
+    margin: 32px 0 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .source-files-head {
+    padding: 8px 16px;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .source-files-list {
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .source-file {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-soft);
+    padding: 3px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .source-file:hover { border-color: var(--accent); background: rgba(121,192,255,0.08); }
+
+  /* ===== EXERCISES & SOLUTIONS ===== */
+  .ex-block { margin-top: 56px; }
+  .ex-section-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 40px 0 12px;
+    font-weight: 600;
+  }
+  details.ex-item, details.sol-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    background: var(--bg-elev);
+  }
+  details.sol-item { border-color: var(--border-soft); }
+  details.ex-item > summary, details.sol-item > summary {
+    padding: 12px 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    list-style: none;
+    user-select: none;
+  }
+  details.ex-item > summary::before {
+    content: "▶";
+    font-size: 9px;
+    color: var(--accent-2);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  details.sol-item > summary::before {
+    content: "▶";
+    font-size: 9px;
+    color: var(--accent-3);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  details[open] > summary::before { transform: rotate(90deg); }
+  details.ex-item > summary { border-left: 3px solid var(--accent-2); }
+  details.sol-item > summary { border-left: 3px solid var(--accent-3); }
+  .ex-body, .sol-body {
+    padding: 4px 20px 16px 20px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .ex-body pre, .sol-body pre {
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: #c9d1d9;
+    margin: 12px 0;
+  }
+  .ex-body pre code, .sol-body pre code {
+    background: transparent; border: none; padding: 0; color: inherit; font-size: inherit;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside>
+    <div class="brand">
+      <h2 class="brand-title">Kubernetes <em>101</em></h2>
+      <div class="brand-sub">From Zero · To Deploy</div>
+    </div>
+    <nav>
+      <ol id="nav-list"></ol>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script>
+/* ============================================
+   SOURCE FILES PER LESSON (relative to index.html)
+   ============================================ */
+const lessonFiles = [
+  [],
+  ['k8s-101/02-setup/cluster.yaml'],
+  ['k8s-101/03-pods/pod.yaml'],
+  ['k8s-101/04-deployments/deployment.yaml'],
+  ['k8s-101/05-services/deployment.yaml', 'k8s-101/05-services/service.yaml'],
+  ['k8s-101/06-config/configmap.yaml', 'k8s-101/06-config/secret.yaml', 'k8s-101/06-config/deployment-with-config.yaml'],
+  ['k8s-101/07-storage/pvc.yaml', 'k8s-101/07-storage/writer.yaml'],
+  ['k8s-101/08-ingress/ingress.yaml', 'k8s-101/08-ingress/api-deployment.yaml', 'k8s-101/08-ingress/web-deployment.yaml'],
+  ['k8s-101/09-namespaces/quota.yaml', 'k8s-101/09-namespaces/limitrange.yaml', 'k8s-101/09-namespaces/deployment-with-probes.yaml'],
+  ['k8s-101/10-capstone/k8s/00-namespace.yaml', 'k8s-101/10-capstone/k8s/01-db-secret.yaml', 'k8s-101/10-capstone/k8s/02-db.yaml', 'k8s-101/10-capstone/k8s/03-api-config.yaml', 'k8s-101/10-capstone/k8s/04-api.yaml', 'k8s-101/10-capstone/k8s/05-web.yaml', 'k8s-101/10-capstone/k8s/06-ingress.yaml'],
+];
+
+/* ============================================
+   LESSON DATA  (content loaded from k8s-101 README files at runtime)
+   ============================================ */
+const lessons = [
+  { title: "What & Why",          src: "k8s-101/01-what-and-why/README.md" },
+  { title: "Setup",               src: "k8s-101/02-setup/README.md" },
+  { title: "Pods",                src: "k8s-101/03-pods/README.md" },
+  { title: "Deployments",         src: "k8s-101/04-deployments/README.md" },
+  { title: "Services",            src: "k8s-101/05-services/README.md" },
+  { title: "Config & Secrets",    src: "k8s-101/06-config/README.md" },
+  { title: "Storage",             src: "k8s-101/07-storage/README.md" },
+  { title: "Ingress",             src: "k8s-101/08-ingress/README.md" },
+  { title: "Namespaces & Limits", src: "k8s-101/09-namespaces/README.md" },
+  { title: "Capstone",            src: "k8s-101/10-capstone/README.md" },
+];
+
+/* ============================================
+   EXERCISE / SOLUTION HELPERS
+   ============================================ */
+function fixLinks(md, srcUrl) {
+  const base = new URL(srcUrl, location.href).href.replace(/[^/]+$/, '');
+  return md.replace(/\]\((?!https?:|#|mailto:)([^)]+)\)/g, (_, href) => {
+    try { return `](${new URL(href, base).href})`; } catch(e) { return `](${href})`; }
+  });
+}
+
+function itemsToDetails(items, cssClass) {
+  return items.map(({ title, body }) => `
+    <details class="${cssClass}">
+      <summary>${title}</summary>
+      <div class="${cssClass === 'ex-item' ? 'ex-body' : 'sol-body'}">${marked.parse(body)}</div>
+    </details>`).join('');
+}
+
+function parseExerciseItems(md) {
+  const stripped = md
+    .replace(/^# .+\n+/m, '')
+    .replace(/^## TODO\n+/m, '')
+    .replace(/When done[^.\n]*\.?\s*\[`?SOLUTION[^)]*\)[^\n]*\n?/gi, '')
+    .trim();
+
+  const parts = stripped.split(/(?=^- \[ \] \*\*)/m).filter(s => s.trim().startsWith('- [ ]'));
+  if (!parts.length) return [{ title: 'Exercises', body: stripped }];
+
+  return parts.map(p => {
+    const m = p.match(/^- \[ \] \*\*([^*]+)\*\*/);
+    const title = m ? m[1].trim().replace(/\.$/, '') : 'Exercise';
+    const body = p.replace(/^- \[ \] \*\*[^*]+\*\*/, '').trim();
+    return { title, body };
+  });
+}
+
+function parseSolutionItems(md) {
+  const noTitle = md.replace(/^# .+\n+/m, '');
+  return noTitle.split(/^---\s*$/m)
+    .map(s => s.trim()).filter(Boolean)
+    .map(section => {
+      const m = section.match(/^##\s+(.+)$/m);
+      const title = m ? m[1].trim() : 'Solution';
+      return { title, body: section };
+    });
+}
+
+async function fetchExercisesHtml(lessonSrc) {
+  const base = new URL(lessonSrc, location.href).href.replace(/[^/]+$/, '');
+  const [todoRes, solRes] = await Promise.allSettled([
+    fetch(base + 'exercises/TODO.md'),
+    fetch(base + 'exercises/SOLUTION.md'),
+  ]);
+
+  let todoHtml = '';
+  let solHtml = '';
+
+  if (todoRes.status === 'fulfilled' && todoRes.value.ok) {
+    const raw = fixLinks(await todoRes.value.text(), base + 'exercises/TODO.md');
+    todoHtml = itemsToDetails(parseExerciseItems(raw), 'ex-item');
+  }
+  if (solRes.status === 'fulfilled' && solRes.value.ok) {
+    const raw = fixLinks(await solRes.value.text(), base + 'exercises/SOLUTION.md');
+    solHtml = itemsToDetails(parseSolutionItems(raw), 'sol-item');
+  }
+
+  if (!todoHtml && !solHtml) return '';
+
+  return `<div class="ex-block">
+    ${todoHtml ? `<div class="ex-section-title">Exercises</div>${todoHtml}` : ''}
+    ${solHtml  ? `<div class="ex-section-title" style="margin-top:32px">Solutions</div>${solHtml}` : ''}
+  </div>`;
+}
+
+/* ============================================
+   RENDER + NAV
+   ============================================ */
+let current = 0;
+
+function renderNav() {
+  const nav = document.getElementById("nav-list");
+  nav.innerHTML = lessons.map((l, i) =>
+    `<li><a href="#" data-i="${i}" class="${i === current ? "active" : ""}">${l.title}</a></li>`
+  ).join("");
+  nav.querySelectorAll("a").forEach(a => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      go(parseInt(a.dataset.i, 10));
+    });
+  });
+}
+
+async function renderLesson() {
+  const l = lessons[current];
+  const prevDisabled = current === 0 ? "disabled" : "";
+  const nextDisabled = current === lessons.length - 1 ? "disabled" : "";
+  const prevTitle = current === 0 ? "" : lessons[current - 1].title;
+  const nextTitle = current === lessons.length - 1 ? "" : lessons[current + 1].title;
+
+  const files = lessonFiles[current] || [];
+  const filesHtml = files.length ? `
+    <div class="source-files">
+      <div class="source-files-head">Source files · k8s-101/</div>
+      <div class="source-files-list">
+        ${files.map(f => `<a href="${f}" target="_blank" class="source-file">${f.replace('k8s-101/', '')}</a>`).join("")}
+      </div>
+    </div>` : "";
+
+  const nav = `
+    <div class="lesson-footer">
+      <button class="nav-btn prev" ${prevDisabled} onclick="go(${current - 1})">
+        <span class="nav-btn-label">← Previous</span>
+        <span class="nav-btn-title">${prevTitle || "—"}</span>
+      </button>
+      <button class="nav-btn next" ${nextDisabled} onclick="go(${current + 1})">
+        <span class="nav-btn-label">Next →</span>
+        <span class="nav-btn-title">${nextTitle || "—"}</span>
+      </button>
+    </div>`;
+
+  const numBadge = `<div class="lesson-num">Lesson ${String(current + 1).padStart(2, "0")} / ${String(lessons.length).padStart(2, "0")}</div>`;
+
+  let tagline = '';
+  let bodyHtml = '';
+
+  try {
+    const resp = await fetch(l.src);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const md = fixLinks(await resp.text(), l.src);
+
+    // Strip h1, extract leading blockquote as tagline, render rest
+    const lines = md.split('\n');
+    let i = 0;
+    while (i < lines.length && !lines[i].startsWith('# ')) i++;
+    if (i < lines.length) i++;
+    while (i < lines.length && lines[i].trim() === '') i++;
+    if (i < lines.length && lines[i].startsWith('> ')) { tagline = lines[i].slice(2).trim(); i++; }
+    bodyHtml = marked.parse(lines.slice(i).join('\n'));
+  } catch (e) {
+    bodyHtml = `<div class="callout warn">
+      <div class="callout-icon">ERR</div>
+      <div class="callout-body">
+        <p>Could not load <code>${l.src}</code>: ${e.message}</p>
+        <p>Serve from a local server: <code>python3 -m http.server 8080</code> then open <code>http://localhost:8080</code></p>
+      </div>
+    </div>`;
+  }
+
+  const exHtml = await fetchExercisesHtml(l.src);
+
+  document.getElementById("content").innerHTML = `
+    <section class="lesson visible">
+      <div class="lesson-header">
+        ${numBadge}
+        <h1>${l.title}</h1>
+        ${tagline ? `<p class="lesson-tagline">${tagline}</p>` : ''}
+      </div>
+      <div class="md-body">${bodyHtml}</div>
+      ${exHtml}
+      ${filesHtml}
+      ${nav}
+    </section>
+  `;
+  document.getElementById("progress").style.width = ((current + 1) / lessons.length * 100) + "%";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function go(i) {
+  if (i < 0 || i >= lessons.length) return;
+  current = i;
+  renderNav();
+  await renderLesson();
+}
+
+renderNav();
+renderLesson();
+</script>
+
+</body>
+</html>

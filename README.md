@@ -41,15 +41,6 @@ You do **not** need cloud accounts. Everything runs on your laptop.
 2. open `index.html`
 3. cd `./k8s-101/01-what-and-why` Follow the lesson and go each lesson's additional resources (exercises, files, etc).
 
-```bash
-# clone, then
-python3 -m http.server 8080 # run the serve to be able to visualize lessons
-cd 01-what-and-why
-$EDITOR README.md
-# work through each lesson in order
-```
-
-Open `docs/index.html` in a browser if you prefer the interactive format with embedded diagrams.
 
 ## Quick install reference
 

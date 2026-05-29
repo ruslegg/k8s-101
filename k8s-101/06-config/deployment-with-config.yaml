@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: hashicorp/http-echo:1.0
+          args: ["-text=hello"]
+          env:
+            # single key from a ConfigMap
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: LOG_LEVEL
+            # single key from a Secret
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: db-creds
+                  key: DB_PASS
+          # also mount the whole ConfigMap as files at /etc/app
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/app
+          ports:
+            - containerPort: 5678
+      volumes:
+        - name: conf
+          configMap:
+            name: app-config

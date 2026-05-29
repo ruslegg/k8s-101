@@ -1,0 +1,38 @@
+# BUG: this Ingress applies, but now nothing routes correctly.
+# Some requests return 404. Some go to the wrong service.
+#
+# Apply:
+#   kubectl apply -f broken-3-ingress.yaml
+#   curl -i http://app.localtest.me/
+#   curl -i http://app.localtest.me/api/time
+#
+# Two things to investigate:
+#   1. Is the ingressClassName correct?
+#   2. Do the path rules actually do what you think they do?
+#      ("Exact" vs "Prefix" matters)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  namespace: capstone
+spec:
+  # ingressClassName intentionally missing
+  rules:
+    - host: app.localtest.me
+      http:
+        paths:
+          # Exact /api means /api/time won't match this rule
+          - path: /api
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

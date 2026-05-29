@@ -1,0 +1,29 @@
+# Node / capstone app
+node_modules/
+dist/
+build/
+.npm
+*.log
+npm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Local kubeconfig overrides
+kubeconfig
+.kube/
+
+# Local environment
+.env
+.env.local
+
+# Build artifacts
+*.tar
+*.tar.gz

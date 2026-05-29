@@ -1,0 +1,47 @@
+# BUG: this PVC stays in Pending forever, and the Deployment that
+# mounts it has pods stuck in Pending too.
+#
+# Run:
+#   kubectl apply -f broken-1.yaml
+#   kubectl get pvc broken-pvc
+#   kubectl describe pvc broken-pvc
+#   kubectl get pods -l app=broken-one
+#   kubectl describe pod -l app=broken-one
+#
+# Read the Events on both objects. The PVC is asking for a
+# StorageClass the cluster doesn't have.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: broken-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: fast-ssd       # this StorageClass doesn't exist in kind
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-one
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: broken-one }
+  strategy: { type: Recreate }
+  template:
+    metadata:
+      labels: { app: broken-one }
+    spec:
+      containers:
+        - name: app
+          image: busybox
+          command: ["sh", "-c", "sleep 3600"]
+          volumeMounts:
+            - { name: store, mountPath: /data }
+      volumes:
+        - name: store
+          persistentVolumeClaim:
+            claimName: broken-pvc

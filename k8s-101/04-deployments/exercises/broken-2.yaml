@@ -1,0 +1,38 @@
+# BUG: this applies fine, pods start briefly, then crash.
+# Run:
+#   kubectl apply -f broken-2.yaml
+#   kubectl get pods -l app=broken-two -w
+#
+# Watch them flap between Running and... something else. After a
+# minute, look at:
+#   kubectl describe pod -l app=broken-two
+# Pay attention to "Last State" and the "Reason" field.
+#
+# Hint: when a container uses more memory than it's allowed, the
+# kernel kills it. The status will say it loud and clear.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-two
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broken-two
+  template:
+    metadata:
+      labels:
+        app: broken-two
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 4Mi
+            limits:
+              cpu: 100m
+              memory: 4Mi      # nginx + a few requests won't fit in 4Mi

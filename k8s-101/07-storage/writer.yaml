@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: writer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: writer
+  strategy:
+    # RWO volumes can't be held by two pods on different nodes at once.
+    # Recreate strategy: kill old pod fully before starting new one.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: writer
+    spec:
+      containers:
+        - name: app
+          image: busybox
+          command:
+            - sh
+            - -c
+            - "while true; do date >> /data/log.txt; sleep 5; done"
+          volumeMounts:
+            - name: store
+              mountPath: /data
+      volumes:
+        - name: store
+          persistentVolumeClaim:
+            claimName: data

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: capstone
+data:
+  # Non-secret config goes here.
+  PORT: "8080"
+  PGHOST: "db"             # the headless Service name
+  PGPORT: "5432"
+  LOG_LEVEL: "info"

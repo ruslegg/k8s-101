@@ -1,0 +1,22 @@
+# BUG: this Secret applies cleanly, the DB pod restarts, but the
+# API now logs "password authentication failed for user 'app'".
+#
+# Why? Postgres baked the password into its data directory the
+# first time it initialized. Changing the Secret here changes what
+# the *API* uses, but does NOT change what Postgres expects.
+#
+# Apply:
+#   kubectl apply -f broken-1-db.yaml
+#   make logs-api
+#
+# Think: which side has stale state? How do you reconcile?
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-creds
+  namespace: capstone
+type: Opaque
+stringData:
+  POSTGRES_USER: app
+  POSTGRES_PASSWORD: differentpassword     # was supersecret
+  POSTGRES_DB: app

@@ -1,0 +1,89 @@
+# Postgres as a StatefulSet.
+#
+# Why StatefulSet (vs Deployment)?
+#   - Stable pod name (db-0, db-1, ...) — DNS works deterministically
+#   - Each replica gets its own PVC via volumeClaimTemplates
+#   - Pods come up in order, terminate in reverse order
+#
+# Why a headless Service (clusterIP: None)?
+#   - StatefulSet pods get DNS like db-0.db.capstone.svc.cluster.local
+#   - For single-replica we don't need that, but it's the canonical setup
+#   - Also serves as the normal Service the api Deployment connects to
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: capstone
+  labels:
+    app: db
+spec:
+  clusterIP: None       # headless
+  selector:
+    app: db
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: capstone
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          envFrom:
+            - secretRef:
+                name: db-creds
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: data
+              # Postgres in the official image writes here.
+              mountPath: /var/lib/postgresql/data
+              # Postgres won't initialize into a directory that already
+              # contains files (PV root has a `lost+found` on some
+              # provisioners). Using a subpath sidesteps that.
+              subPath: pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "app", "-d", "app"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "app", "-d", "app"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi

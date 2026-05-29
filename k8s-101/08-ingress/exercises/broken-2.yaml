@@ -1,0 +1,27 @@
+# BUG: this Ingress applies but returns 503 Service Temporarily
+# Unavailable.
+#
+# Run:
+#   kubectl apply -f broken-2.yaml
+#   curl -v http://broken-two.localtest.me/
+#   kubectl describe ingress broken-two
+#   kubectl get svc
+#
+# The Ingress references a Service. Does that Service exist with
+# that name? Does it have the port the Ingress is asking for?
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-two
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: broken-two.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webb                # is this the right name?
+                port: { number: 8080 }    # is this the right port?

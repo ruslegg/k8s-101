@@ -1,0 +1,45 @@
+# BUG: this applies AND pod reaches Running. But the env var is
+# empty. Find out why.
+#
+# Run:
+#   kubectl apply -f broken-2.yaml
+#   kubectl logs -l app=broken-two
+#   kubectl get configmap broken-cm -o yaml
+#
+# Compare the keys in the ConfigMap to the key the env var refers to.
+# Hint: optional defaults silently to false… until you set it to
+# true to make a missing key NOT fail. Look carefully.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: broken-cm
+data:
+  LOG_LEVEL: debug
+  FEATURE_X: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-two
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-two
+  template:
+    metadata:
+      labels:
+        app: broken-two
+    spec:
+      containers:
+        - name: app
+          image: busybox
+          command: ["sh", "-c", "echo LOG_LEVEL=$LOG_LEVEL; sleep 3600"]
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: broken-cm
+                  key: log_level         # casing matters…
+                  optional: true         # so missing key just yields empty

@@ -1,0 +1,27 @@
+# BUG: this Ingress applies, but curl returns 404. The ADDRESS
+# column in `kubectl get ingress` will probably be empty.
+#
+# Run:
+#   kubectl apply -f broken-1.yaml
+#   kubectl get ingress broken-one
+#   kubectl describe ingress broken-one
+#
+# Compare to the working ingress.yaml in the parent folder. What
+# critical field is missing here? Without it, the ingress-nginx
+# controller doesn't know it should handle this Ingress.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-one
+spec:
+  # ingressClassName: ???     ← what's missing?
+  rules:
+    - host: broken-one.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port: { number: 80 }

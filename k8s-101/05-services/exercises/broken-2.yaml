@@ -1,0 +1,25 @@
+# BUG: this Service has the right selector, endpoints look fine,
+# but connections fail.
+# Run:
+#   kubectl apply -f broken-2.yaml
+#   kubectl get endpoints broken-two
+#   kubectl run tester --rm -it --image=curlimages/curl --restart=Never -- \
+#     curl -v http://broken-two
+#
+# The curl will fail. Why? The Service forwards traffic on port 80
+# to... what port on the pod?
+#
+# Inside the nginx pod, what port does nginx actually listen on?
+# Use `kubectl exec` to verify.
+#
+# Assume the Deployment from the parent folder is running (app=web).
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-two
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 8080        # nginx isn't listening here…

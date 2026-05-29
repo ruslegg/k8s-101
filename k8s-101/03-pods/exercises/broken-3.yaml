@@ -1,0 +1,22 @@
+# BUG: this applies fine, the image pulls fine, but the pod keeps
+# crashing. The STATUS will eventually show CrashLoopBackOff.
+#
+# Hints:
+#   kubectl logs broken-three              # what does the container print?
+#   kubectl logs broken-three --previous   # if the current container restarts too fast
+#   kubectl describe pod broken-three      # how many restarts? what's the exit code?
+#
+# A container exits as soon as its main process exits. The pod is a
+# web server — but what is the container *actually* running? Look at
+# the `command:` field carefully.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken-three
+spec:
+  containers:
+    - name: web
+      image: nginx:alpine
+      command: ["sh", "-c", "echo starting; exit 1"]
+      ports:
+        - containerPort: 80

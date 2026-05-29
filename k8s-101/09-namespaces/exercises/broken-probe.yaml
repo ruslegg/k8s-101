@@ -1,0 +1,46 @@
+# BUG: this Deployment applies, pods start, then enter a restart
+# loop. They never stabilize.
+#
+# Run:
+#   kubectl apply -f broken-probe.yaml
+#   kubectl get pods -l app=broken-probe -w
+#   kubectl describe pod -l app=broken-probe
+#
+# Look at:
+#   - the container's actual listening port (use kubectl exec + netstat)
+#   - the path the readiness probe checks
+#   - the path the liveness probe checks
+#   - what the container can actually serve
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-probe
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: broken-probe }
+  template:
+    metadata:
+      labels: { app: broken-probe }
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          ports:
+            - { containerPort: 80 }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080      # nginx isn't here
+            periodSeconds: 5
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz   # nginx doesn't serve this
+              port: 80
+            periodSeconds: 5
+            failureThreshold: 2
+            timeoutSeconds: 1

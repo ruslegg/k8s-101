@@ -1,0 +1,15 @@
+# BUG: this applies fine, but the pod never reaches Running.
+# Look at:
+#   kubectl get pods
+#   kubectl describe pod broken-two
+# What does the "STATUS" column say? What do the Events tell you?
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken-two
+spec:
+  containers:
+    - name: web
+      image: nginx:alpne
+      ports:
+        - containerPort: 80

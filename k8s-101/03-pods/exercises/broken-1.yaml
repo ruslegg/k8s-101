@@ -1,0 +1,14 @@
+# BUG: this manifest won't even apply. Run:
+#   kubectl apply -f broken-1.yaml
+# and read the error carefully. The Kubernetes API server validates
+# objects on the way in. Fix the structural problem.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken-one
+spec:
+  containers:
+    name: web
+    image: nginx:alpine
+    ports:
+      - containerPort: 80

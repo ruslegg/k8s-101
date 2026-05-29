@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  namespace: capstone
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.localtest.me
+      http:
+        paths:
+          # /api/* → api service. Order matters in spec but ingress-nginx
+          # sorts by specificity, so /api wins for /api/* regardless.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
+          # everything else → web (the React SPA)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

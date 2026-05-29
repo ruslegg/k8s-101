@@ -1,0 +1,46 @@
+# BUG: PVC binds, pod runs, but data still vanishes on pod delete.
+#
+# Run:
+#   kubectl apply -f broken-2.yaml
+#   sleep 15
+#   kubectl exec deploy/broken-two -- wc -l /data/log.txt 2>/dev/null || echo "no /data/log.txt"
+#   kubectl exec deploy/broken-two -- find / -name "log.txt" 2>/dev/null
+#
+# The volume IS mounted. The app IS writing. They're just in
+# different directories.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: broken-pvc-2
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-two
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: broken-two }
+  strategy: { type: Recreate }
+  template:
+    metadata:
+      labels: { app: broken-two }
+    spec:
+      containers:
+        - name: app
+          image: busybox
+          # writes to /data/log.txt
+          command: ["sh", "-c", "while true; do date >> /data/log.txt; sleep 5; done"]
+          volumeMounts:
+            - name: store
+              mountPath: /var/storage      # but the volume is mounted here
+      volumes:
+        - name: store
+          persistentVolumeClaim:
+            claimName: broken-pvc-2

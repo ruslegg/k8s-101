@@ -1,0 +1,76 @@
+# BUG: this Deployment applies, the new ReplicaSet starts spinning
+# up pods, but they never become Ready. The rolling update gets
+# stuck — old pods stay because new ones don't pass the readiness
+# probe.
+#
+# Apply:
+#   kubectl apply -f broken-2-api.yaml
+#   kubectl -n capstone get pods -l app=api
+#   kubectl -n capstone describe pod -l app=api | tail -40
+#   kubectl -n capstone logs -l app=api --tail=20
+#
+# There are TWO problems hiding in this file:
+#   1. The readiness probe — is it hitting where the API listens?
+#   2. The DB connection — even after you fix #1, /api/time will
+#      still fail. Why? (look at PGHOST vs the working manifest)
+#
+# Fix both and re-apply.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: capstone
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: k8s-101/api:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            - name: PGHOST
+              value: "database"           # should be "db"
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef: { name: db-creds, key: POSTGRES_USER }
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-creds, key: POSTGRES_PASSWORD }
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef: { name: db-creds, key: POSTGRES_DB }
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000          # API listens on 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000          # same problem here
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 250m, memory: 256Mi }

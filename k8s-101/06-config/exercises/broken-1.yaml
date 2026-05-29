@@ -1,0 +1,33 @@
+# BUG: this Deployment applies, but pods get stuck in
+# CreateContainerConfigError.
+# Run:
+#   kubectl apply -f broken-1.yaml
+#   kubectl get pods -l app=broken-one
+#   kubectl describe pod -l app=broken-one
+#
+# Look at the Events section. K8s tells you exactly which object
+# it can't find.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-one
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-one
+  template:
+    metadata:
+      labels:
+        app: broken-one
+    spec:
+      containers:
+        - name: app
+          image: busybox
+          command: ["sh", "-c", "echo LOG_LEVEL=$LOG_LEVEL; sleep 3600"]
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: missing-config       # this ConfigMap doesn't exist
+                  key: LOG_LEVEL

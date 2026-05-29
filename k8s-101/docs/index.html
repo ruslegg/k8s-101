@@ -1,0 +1,2151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kubernetes 101 — From Zero to Deploy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-elev: #161b22;
+    --bg-soft: #1c232c;
+    --border: #30363d;
+    --border-soft: #21262d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-faint: #6e7681;
+    --accent: #79c0ff;      /* k8s-ish blue */
+    --accent-2: #ffa657;    /* orange */
+    --accent-3: #7ee787;    /* green */
+    --accent-4: #ff7b72;    /* red */
+    --accent-5: #d2a8ff;    /* purple */
+    --yellow: #e3b341;
+    --serif: "Fraunces", Georgia, serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    --sans: "Inter", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(121, 192, 255, 0.04), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(210, 168, 255, 0.04), transparent 45%);
+    min-height: 100vh;
+  }
+
+  /* ===== LAYOUT ===== */
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  aside {
+    border-right: 1px solid var(--border);
+    background: rgba(13, 17, 23, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 32px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .brand {
+    padding: 0 28px 28px;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 18px;
+  }
+  .brand-title {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 0;
+  }
+  .brand-title em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 400;
+  }
+  .brand-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  nav ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: nav;
+  }
+  nav li {
+    counter-increment: nav;
+  }
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 28px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 2px solid transparent;
+    transition: all 0.15s ease;
+  }
+  nav a::before {
+    content: counter(nav, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+  }
+  nav a:hover {
+    color: var(--text);
+    background: var(--bg-elev);
+  }
+  nav a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(121, 192, 255, 0.06);
+  }
+  nav a.active::before { color: var(--accent); }
+
+  main {
+    padding: 64px 80px 120px;
+    max-width: 920px;
+  }
+
+  /* ===== SECTIONS ===== */
+  section.lesson { display: none; }
+  section.lesson.visible { display: block; animation: fadeIn 0.3s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .lesson-header {
+    padding-bottom: 28px;
+    margin-bottom: 36px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .lesson-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 52px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    margin: 0 0 14px;
+  }
+  h1 em { font-style: italic; color: var(--accent); font-weight: 400; }
+  .lesson-tagline {
+    font-family: var(--serif);
+    font-size: 19px;
+    color: var(--text-dim);
+    font-style: italic;
+    line-height: 1.4;
+    max-width: 640px;
+    margin: 0;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+    margin: 56px 0 16px;
+    line-height: 1.2;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 32px 0 12px;
+    color: var(--text);
+    letter-spacing: -0.005em;
+  }
+
+  p { margin: 0 0 16px; color: #c9d1d9; }
+  p strong { color: var(--text); font-weight: 600; }
+  p em { color: var(--accent-2); font-style: italic; }
+
+  ul, ol { padding-left: 22px; margin: 0 0 16px; color: #c9d1d9; }
+  li { margin-bottom: 6px; }
+  li code { font-size: 13px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    background: var(--bg-soft);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-soft);
+    color: var(--accent);
+  }
+
+  /* ===== CODE BLOCKS ===== */
+  .code {
+    position: relative;
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 18px 0 24px;
+    overflow: hidden;
+  }
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .copy-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--accent-3); border-color: var(--accent-3); }
+  .copy-btn.copied { color: var(--accent-3); border-color: var(--accent-3); }
+
+  pre {
+    margin: 0;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  pre .c { color: var(--text-faint); font-style: italic; }      /* comment */
+  pre .k { color: var(--accent-4); }                            /* keyword */
+  pre .s { color: var(--accent-3); }                            /* string */
+  pre .n { color: var(--accent-2); }                            /* number/value */
+  pre .p { color: var(--accent-5); }                            /* prompt $ */
+  pre .y { color: var(--yellow); }                              /* yaml key */
+  pre .b { color: var(--accent); }                              /* builtin/highlight */
+  pre .o { color: #c9d1d9; }                                    /* operator */
+
+  /* ===== CARDS / CALLOUTS ===== */
+  .callout {
+    display: flex;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+  }
+  .callout-icon {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    padding-top: 1px;
+    flex-shrink: 0;
+  }
+  .callout-body { flex: 1; font-size: 14.5px; line-height: 1.6; }
+  .callout-body p:last-child { margin-bottom: 0; }
+  .callout.tip { border-left: 3px solid var(--accent-3); }
+  .callout.tip .callout-icon { color: var(--accent-3); }
+  .callout.warn { border-left: 3px solid var(--yellow); }
+  .callout.warn .callout-icon { color: var(--yellow); }
+  .callout.info { border-left: 3px solid var(--accent); }
+  .callout.info .callout-icon { color: var(--accent); }
+
+  /* ===== DIAGRAMS ===== */
+  .diagram {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    margin: 24px 0 28px;
+    overflow-x: auto;
+  }
+  .diagram svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  .diagram-caption {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    margin-top: 14px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* ===== EXERCISE ===== */
+  .exercise {
+    margin: 32px 0;
+    border: 1px solid var(--accent-2);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 166, 87, 0.04), transparent 60%);
+    overflow: hidden;
+  }
+  .exercise-head {
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(255, 166, 87, 0.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .exercise-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--accent-2);
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .exercise-title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--text);
+  }
+  .exercise-body { padding: 20px 22px 4px; }
+  .exercise-body p { font-size: 15px; }
+  .reveal-btn {
+    background: transparent;
+    border: 1px solid var(--accent-2);
+    color: var(--accent-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 8px 22px 22px;
+    transition: all 0.15s;
+  }
+  .reveal-btn:hover { background: var(--accent-2); color: var(--bg); }
+  .solution { display: none; padding: 0 22px 22px; }
+  .solution.visible { display: block; }
+  .solution-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent-3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* ===== NAV BUTTONS ===== */
+  .lesson-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 72px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .nav-btn {
+    flex: 1;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    font-family: var(--sans);
+    transition: all 0.15s;
+  }
+  .nav-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .nav-btn.next { text-align: right; }
+  .nav-btn-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .nav-btn-title { font-family: var(--serif); font-style: italic; font-size: 17px; }
+
+  /* ===== PROGRESS ===== */
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 280px; right: 0;
+    height: 2px;
+    background: transparent;
+    z-index: 100;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .terminal-prompt::before {
+    content: "$ ";
+    color: var(--accent-5);
+    font-weight: 700;
+  }
+
+  /* table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+  td code { font-size: 12.5px; }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    aside {
+      position: static; height: auto; padding: 20px 0;
+      border-right: none; border-bottom: 1px solid var(--border);
+    }
+    main { padding: 40px 24px 80px; }
+    .progress-bar { left: 0; }
+    h1 { font-size: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside>
+    <div class="brand">
+      <h2 class="brand-title">Kubernetes <em>101</em></h2>
+      <div class="brand-sub">From Zero · To Deploy</div>
+    </div>
+    <nav>
+      <ol id="nav-list"></ol>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script>
+/* ============================================
+   LESSON DATA
+   Each lesson: { title, tagline, html }
+   ============================================ */
+const lessons = [
+  /* ===== LESSON 1 ===== */
+  {
+    title: "What & Why",
+    tagline: "Before you orchestrate, you should know what's being orchestrated — and why anyone bothered to invent this.",
+    html: `
+      <h2>The 60-second story</h2>
+      <p>You have an app. It runs on your laptop. Now you need it to run on 10 servers, survive crashes, scale up on Black Friday, and roll out updates without downtime. Doing this by hand is misery. <strong>Kubernetes is a robot that does it for you.</strong></p>
+
+      <p>More precisely: Kubernetes (K8s) is a system that takes a description of what you want — "run 3 copies of my API, expose it on port 80, restart if it crashes" — and makes reality match. It's a <em>declarative orchestrator</em> for containers.</p>
+
+      <h2>Containers vs VMs vs Bare Metal</h2>
+      <div class="diagram">
+        <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .label { font: 600 12px "Inter", sans-serif; fill: #e6edf3; }
+            .sub   { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; letter-spacing: 0.05em; }
+            .hw    { font: 500 11px "JetBrains Mono", monospace; fill: #6e7681; }
+          </style>
+          <!-- Bare Metal -->
+          <g transform="translate(20,20)">
+            <text class="sub" x="100" y="-4" text-anchor="middle">BARE METAL</text>
+            <rect x="0" y="0" width="200" height="40" rx="3" fill="#161b22" stroke="#30363d"/>
+            <text class="hw" x="100" y="25" text-anchor="middle">Hardware</text>
+            <rect x="0" y="46" width="200" height="40" rx="3" fill="#1c232c" stroke="#30363d"/>
+            <text class="label" x="100" y="71" text-anchor="middle">Operating System</text>
+            <rect x="20" y="100" width="160" height="100" rx="4" fill="#79c0ff" opacity="0.15" stroke="#79c0ff"/>
+            <text class="label" x="100" y="155" text-anchor="middle" fill="#79c0ff">App</text>
+          </g>
+          <!-- VMs -->
+          <g transform="translate(260,20)">
+            <text class="sub" x="100" y="-4" text-anchor="middle">VIRTUAL MACHINES</text>
+            <rect x="0" y="0" width="200" height="30" rx="3" fill="#161b22" stroke="#30363d"/>
+            <text class="hw" x="100" y="20" text-anchor="middle">Hardware</text>
+            <rect x="0" y="34" width="200" height="22" rx="3" fill="#1c232c" stroke="#30363d"/>
+            <text class="hw" x="100" y="50" text-anchor="middle">Host OS / Hypervisor</text>
+            <!-- VM 1 -->
+            <rect x="6" y="62" width="92" height="140" rx="4" fill="#1c232c" stroke="#30363d"/>
+            <rect x="14" y="70" width="76" height="26" rx="3" fill="#21262d" stroke="#30363d"/>
+            <text class="hw" x="52" y="87" text-anchor="middle">Guest OS</text>
+            <rect x="14" y="100" width="76" height="22" rx="3" fill="#21262d" stroke="#30363d"/>
+            <text class="hw" x="52" y="115" text-anchor="middle">Libs</text>
+            <rect x="14" y="126" width="76" height="68" rx="4" fill="#79c0ff" opacity="0.15" stroke="#79c0ff"/>
+            <text class="label" x="52" y="164" text-anchor="middle" fill="#79c0ff">App</text>
+            <!-- VM 2 -->
+            <rect x="102" y="62" width="92" height="140" rx="4" fill="#1c232c" stroke="#30363d"/>
+            <rect x="110" y="70" width="76" height="26" rx="3" fill="#21262d" stroke="#30363d"/>
+            <text class="hw" x="148" y="87" text-anchor="middle">Guest OS</text>
+            <rect x="110" y="100" width="76" height="22" rx="3" fill="#21262d" stroke="#30363d"/>
+            <text class="hw" x="148" y="115" text-anchor="middle">Libs</text>
+            <rect x="110" y="126" width="76" height="68" rx="4" fill="#d2a8ff" opacity="0.15" stroke="#d2a8ff"/>
+            <text class="label" x="148" y="164" text-anchor="middle" fill="#d2a8ff">App</text>
+          </g>
+          <!-- Containers -->
+          <g transform="translate(500,20)">
+            <text class="sub" x="100" y="-4" text-anchor="middle">CONTAINERS</text>
+            <rect x="0" y="0" width="200" height="30" rx="3" fill="#161b22" stroke="#30363d"/>
+            <text class="hw" x="100" y="20" text-anchor="middle">Hardware</text>
+            <rect x="0" y="34" width="200" height="22" rx="3" fill="#1c232c" stroke="#30363d"/>
+            <text class="hw" x="100" y="50" text-anchor="middle">Host OS</text>
+            <rect x="0" y="60" width="200" height="22" rx="3" fill="#1c232c" stroke="#30363d"/>
+            <text class="hw" x="100" y="76" text-anchor="middle">Container Runtime</text>
+            <!-- containers -->
+            <rect x="6" y="88" width="60" height="112" rx="3" fill="#79c0ff" opacity="0.15" stroke="#79c0ff"/>
+            <text class="label" x="36" y="120" text-anchor="middle" fill="#79c0ff">App</text>
+            <text class="hw" x="36" y="138" text-anchor="middle">+libs</text>
+            <rect x="70" y="88" width="60" height="112" rx="3" fill="#d2a8ff" opacity="0.15" stroke="#d2a8ff"/>
+            <text class="label" x="100" y="120" text-anchor="middle" fill="#d2a8ff">App</text>
+            <text class="hw" x="100" y="138" text-anchor="middle">+libs</text>
+            <rect x="134" y="88" width="60" height="112" rx="3" fill="#7ee787" opacity="0.15" stroke="#7ee787"/>
+            <text class="label" x="164" y="120" text-anchor="middle" fill="#7ee787">App</text>
+            <text class="hw" x="164" y="138" text-anchor="middle">+libs</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">Containers share the host OS kernel — lighter, faster to start, denser packing</div>
+      </div>
+
+      <p>A container is your app plus everything it needs to run, packaged together (the "image"). It boots in milliseconds and runs anywhere the runtime exists. Docker is the most famous tool for building containers; Kubernetes runs them at scale.</p>
+
+      <h2>What Kubernetes actually does</h2>
+      <p>Kubernetes is a control loop. You tell it the <em>desired state</em> (3 copies of my API, please). It observes <em>actual state</em>. If they differ, it acts.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .lbl { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .lbl2 { font: 500 11px "JetBrains Mono", monospace; fill: #8b949e; }
+            .arrow { stroke: #79c0ff; stroke-width: 1.8; fill: none; }
+          </style>
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#79c0ff"/>
+            </marker>
+          </defs>
+          <rect x="40" y="40" width="160" height="80" rx="8" fill="#1c232c" stroke="#79c0ff"/>
+          <text class="lbl" x="120" y="74" text-anchor="middle">Desired State</text>
+          <text class="lbl2" x="120" y="96" text-anchor="middle">your YAML</text>
+
+          <rect x="400" y="40" width="160" height="80" rx="8" fill="#1c232c" stroke="#ffa657"/>
+          <text class="lbl" x="480" y="74" text-anchor="middle">Actual State</text>
+          <text class="lbl2" x="480" y="96" text-anchor="middle">running cluster</text>
+
+          <rect x="220" y="40" width="160" height="80" rx="8" fill="#161b22" stroke="#30363d"/>
+          <text class="lbl" x="300" y="74" text-anchor="middle">Control Loop</text>
+          <text class="lbl2" x="300" y="96" text-anchor="middle">reconciler</text>
+
+          <path class="arrow" d="M 200 70 L 215 70" marker-end="url(#arr)"/>
+          <path class="arrow" d="M 380 70 L 395 70" marker-end="url(#arr)"/>
+          <path class="arrow" d="M 400 100 Q 300 170 220 100" marker-end="url(#arr)"/>
+          <text class="lbl2" x="300" y="175" text-anchor="middle" fill="#8b949e">observe &amp; reconcile</text>
+        </svg>
+      </div>
+
+      <h2>When you do NOT need Kubernetes</h2>
+      <ul>
+        <li>Your app fits on one server and doesn't need to scale.</li>
+        <li>You don't run multiple services that need to talk to each other.</li>
+        <li>Your platform (Vercel, Fly, Railway, App Runner) already handles this for you.</li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-icon">TIP</div>
+        <div class="callout-body">
+          <p>Kubernetes is a complexity multiplier. It pays off when you have <em>real</em> distributed-system needs. Don't reach for it because it's on a resume; reach for it because you have a problem it solves.</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 01</span>
+          <span class="exercise-title">Pick the right tool</span>
+        </div>
+        <div class="exercise-body">
+          <p>For each scenario, decide: <strong>Kubernetes</strong>, <strong>plain Docker</strong>, or <strong>Neither</strong>?</p>
+          <ol>
+            <li>A static marketing site, 50 visits a day.</li>
+            <li>A backend API + Postgres + Redis + worker queue, ~10 microservices, needs zero-downtime deploys.</li>
+            <li>A weekend hobby project: one Node.js server.</li>
+            <li>A monolith you deploy to one VPS but want to package consistently.</li>
+          </ol>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">Show Answers</button>
+        <div class="solution">
+          <div class="solution-label">// Reasonable answers</div>
+          <ol>
+            <li><strong>Neither.</strong> Use a static host (Netlify, S3+CloudFront). Don't overbuild.</li>
+            <li><strong>Kubernetes.</strong> Multiple services, scaling, rolling updates — this is the use case.</li>
+            <li><strong>Neither</strong> (or plain Docker locally). A PaaS like Fly/Railway is faster.</li>
+            <li><strong>Plain Docker.</strong> Containerize for consistency, but no orchestrator needed for one box.</li>
+          </ol>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 2 ===== */
+  {
+    title: "Setup",
+    tagline: "Install three things. Verify they work. Then we play with a real cluster on your laptop.",
+    html: `
+      <h2>What we'll install</h2>
+      <table>
+        <thead><tr><th>Tool</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>docker</code></td><td>Container runtime — builds and runs images</td></tr>
+          <tr><td><code>kind</code></td><td>"Kubernetes in Docker" — a real cluster inside containers</td></tr>
+          <tr><td><code>kubectl</code></td><td>Command-line client to talk to the cluster</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Why kind over Docker Desktop's built-in K8s or minikube?</strong> kind is fast, scriptable, and lets you spin up multi-node clusters trivially. It's what most teams use for CI.</p>
+
+      <h2>Install</h2>
+      <h3>macOS (Homebrew)</h3>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> brew install docker kind kubectl
+<span class="p">$</span> open -a Docker  <span class="c"># start Docker Desktop</span></pre>
+      </div>
+
+      <h3>Linux</h3>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="c"># docker — follow docs.docker.com for your distro</span>
+<span class="c"># kind</span>
+<span class="p">$</span> [ <span class="s">"$(uname -m)"</span> = x86_64 ] &amp;&amp; curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+<span class="p">$</span> chmod +x ./kind &amp;&amp; sudo mv ./kind /usr/local/bin/
+<span class="c"># kubectl</span>
+<span class="p">$</span> curl -LO <span class="s">"https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"</span>
+<span class="p">$</span> sudo install -m 0755 kubectl /usr/local/bin/kubectl</pre>
+      </div>
+
+      <h3>Windows</h3>
+      <p>Easiest path: install <strong>Docker Desktop</strong> (it bundles a working kubectl) and then <code>winget install Kubernetes.kind</code>. Or use WSL2 + the Linux instructions above (recommended for serious work).</p>
+
+      <h2>Create your first cluster</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kind create cluster --name k8s-101
+<span class="c"># ✓ Ensuring node image  ✓ Preparing nodes  ✓ Writing configuration ...</span>
+
+<span class="p">$</span> kubectl cluster-info
+<span class="b">Kubernetes control plane</span> is running at https://127.0.0.1:60123
+
+<span class="p">$</span> kubectl get nodes
+NAME                     STATUS   ROLES           AGE   VERSION
+k8s-101-control-plane    Ready    control-plane   34s   v1.30.0</pre>
+      </div>
+
+      <p>If you see a node in <code>Ready</code> state — congratulations, you have a real Kubernetes cluster.</p>
+
+      <h2>The cluster, conceptually</h2>
+      <div class="diagram">
+        <svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 12px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; }
+            .h { font: 700 11px "JetBrains Mono", monospace; letter-spacing: 0.1em; }
+          </style>
+          <!-- Control plane -->
+          <rect x="40" y="40" width="240" height="220" rx="10" fill="#161b22" stroke="#79c0ff" stroke-dasharray="4,3"/>
+          <text class="h" x="160" y="62" text-anchor="middle" fill="#79c0ff">CONTROL PLANE</text>
+          <rect x="60" y="80" width="200" height="34" rx="5" fill="#1c232c" stroke="#30363d"/>
+          <text class="t" x="160" y="101" text-anchor="middle">API Server</text>
+          <rect x="60" y="122" width="200" height="34" rx="5" fill="#1c232c" stroke="#30363d"/>
+          <text class="t" x="160" y="143" text-anchor="middle">Scheduler</text>
+          <rect x="60" y="164" width="200" height="34" rx="5" fill="#1c232c" stroke="#30363d"/>
+          <text class="t" x="160" y="185" text-anchor="middle">Controller Manager</text>
+          <rect x="60" y="206" width="200" height="34" rx="5" fill="#1c232c" stroke="#30363d"/>
+          <text class="t" x="160" y="227" text-anchor="middle">etcd <tspan class="tm">(the brain's memory)</tspan></text>
+
+          <!-- Workers -->
+          <g>
+            <rect x="340" y="40" width="260" height="100" rx="10" fill="#161b22" stroke="#7ee787" stroke-dasharray="4,3"/>
+            <text class="h" x="470" y="62" text-anchor="middle" fill="#7ee787">WORKER NODE</text>
+            <rect x="360" y="74" width="100" height="50" rx="4" fill="#1c232c" stroke="#30363d"/>
+            <text class="tm" x="410" y="94" text-anchor="middle">kubelet</text>
+            <text class="tm" x="410" y="108" text-anchor="middle" fill="#6e7681">(node agent)</text>
+            <rect x="475" y="74" width="105" height="50" rx="4" fill="#1c232c" stroke="#30363d"/>
+            <text class="tm" x="527" y="94" text-anchor="middle">container runtime</text>
+            <text class="tm" x="527" y="108" text-anchor="middle" fill="#6e7681">(runs pods)</text>
+
+            <rect x="340" y="160" width="260" height="100" rx="10" fill="#161b22" stroke="#7ee787" stroke-dasharray="4,3"/>
+            <text class="h" x="470" y="182" text-anchor="middle" fill="#7ee787">WORKER NODE</text>
+            <rect x="360" y="194" width="100" height="50" rx="4" fill="#1c232c" stroke="#30363d"/>
+            <text class="tm" x="410" y="214" text-anchor="middle">kubelet</text>
+            <rect x="475" y="194" width="105" height="50" rx="4" fill="#1c232c" stroke="#30363d"/>
+            <text class="tm" x="527" y="214" text-anchor="middle">container runtime</text>
+          </g>
+
+          <!-- arrows -->
+          <line x1="280" y1="95" x2="338" y2="95" stroke="#79c0ff" stroke-width="1.5" marker-end="url(#arr2)"/>
+          <line x1="280" y1="215" x2="338" y2="215" stroke="#79c0ff" stroke-width="1.5" marker-end="url(#arr2)"/>
+          <defs>
+            <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#79c0ff"/>
+            </marker>
+          </defs>
+        </svg>
+        <div class="diagram-caption">Control plane = brain · Worker nodes = muscle that runs your containers</div>
+      </div>
+
+      <p>Right now your kind cluster has <em>one</em> node playing both roles. That's fine for learning.</p>
+
+      <h2>Make kubectl pleasant</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="c"># add to ~/.zshrc or ~/.bashrc</span>
+alias k=kubectl
+source &lt;(kubectl completion zsh)  <span class="c"># or 'bash'</span>
+complete -F __start_kubectl k</pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">TIP</div>
+        <div class="callout-body">
+          <p>Every <code>kubectl</code> command in this tutorial works as <code>k</code> after that alias. You'll type it 500 times today. Save your wrists.</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 02</span>
+          <span class="exercise-title">Verify and explore</span>
+        </div>
+        <div class="exercise-body">
+          <p>Run these and read the output carefully. The point is to learn how to <em>look around</em>.</p>
+          <ol>
+            <li><code>kubectl get nodes -o wide</code></li>
+            <li><code>kubectl get pods --all-namespaces</code></li>
+            <li><code>kubectl get namespaces</code></li>
+            <li><code>kubectl version</code></li>
+          </ol>
+          <p>What do you see in <code>kube-system</code>? Those are the system pods that make Kubernetes itself work.</p>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">What you should see</button>
+        <div class="solution">
+          <div class="solution-label">// expected</div>
+          <p>You'll see pods like <code>coredns</code> (cluster DNS), <code>kube-proxy</code> (network routing), <code>etcd</code>, <code>kube-apiserver</code>, <code>kube-scheduler</code>. These are the components from the diagram above, running as pods themselves. Kubernetes is built on Kubernetes.</p>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 3: PODS ===== */
+  {
+    title: "Pods",
+    tagline: "The smallest deployable unit. Not the container — the pod. This distinction matters.",
+    html: `
+      <h2>What is a Pod?</h2>
+      <p>A Pod is a wrapper around one or more containers that share a network namespace and storage. <strong>You never run a bare container on Kubernetes — you run pods.</strong></p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 520 200" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; }
+            .pod-label { font: 700 11px "JetBrains Mono", monospace; letter-spacing: 0.1em; fill: #79c0ff; }
+          </style>
+          <!-- single container pod -->
+          <g transform="translate(20,30)">
+            <text class="pod-label" x="100" y="0">POD (typical)</text>
+            <rect x="0" y="10" width="200" height="130" rx="10" fill="#161b22" stroke="#79c0ff" stroke-dasharray="4,3"/>
+            <rect x="30" y="30" width="140" height="80" rx="6" fill="#1c232c" stroke="#7ee787"/>
+            <text class="t" x="100" y="64" text-anchor="middle">container</text>
+            <text class="tm" x="100" y="82" text-anchor="middle">app: nginx</text>
+            <text class="tm" x="100" y="155" text-anchor="middle">shared: IP, port space, volumes</text>
+          </g>
+          <!-- multi container pod -->
+          <g transform="translate(280,30)">
+            <text class="pod-label" x="110" y="0">POD (sidecar pattern)</text>
+            <rect x="0" y="10" width="220" height="130" rx="10" fill="#161b22" stroke="#79c0ff" stroke-dasharray="4,3"/>
+            <rect x="15" y="30" width="90" height="80" rx="6" fill="#1c232c" stroke="#7ee787"/>
+            <text class="t" x="60" y="64" text-anchor="middle">app</text>
+            <text class="tm" x="60" y="82" text-anchor="middle">main</text>
+            <rect x="115" y="30" width="90" height="80" rx="6" fill="#1c232c" stroke="#d2a8ff"/>
+            <text class="t" x="160" y="64" text-anchor="middle">log-shipper</text>
+            <text class="tm" x="160" y="82" text-anchor="middle">sidecar</text>
+            <text class="tm" x="110" y="155" text-anchor="middle">talk via localhost</text>
+          </g>
+        </svg>
+        <div class="diagram-caption">Containers in a pod are best friends — they're scheduled together and share localhost</div>
+      </div>
+
+      <p>99% of the time, one pod = one container. Multi-container pods exist for tight-coupling patterns (logging sidecars, proxies). Don't overuse them.</p>
+
+      <h2>Run your first pod (the imperative way)</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl run hello --image=nginx:alpine
+pod/hello created
+
+<span class="p">$</span> kubectl get pods
+NAME    READY   STATUS    RESTARTS   AGE
+hello   1/1     Running   0          12s
+
+<span class="p">$</span> kubectl describe pod hello   <span class="c"># everything K8s knows about it</span>
+<span class="p">$</span> kubectl logs hello             <span class="c"># container's stdout/stderr</span>
+<span class="p">$</span> kubectl exec -it hello -- sh   <span class="c"># shell into it</span></pre>
+      </div>
+
+      <p>That works, but <code>kubectl run</code> is for poking around. The real way is <em>declarative</em>: write a YAML file describing what you want, then apply it.</p>
+
+      <h2>The declarative way (YAML)</h2>
+      <div class="code">
+        <div class="code-head"><span>pod.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Pod</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">hello</span>
+  <span class="y">labels:</span>
+    <span class="y">app:</span> <span class="s">hello</span>
+<span class="y">spec:</span>
+  <span class="y">containers:</span>
+    - <span class="y">name:</span> <span class="s">web</span>
+      <span class="y">image:</span> <span class="s">nginx:alpine</span>
+      <span class="y">ports:</span>
+        - <span class="y">containerPort:</span> <span class="n">80</span></pre>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl delete pod hello    <span class="c"># clean up the imperative one</span>
+<span class="p">$</span> kubectl apply -f pod.yaml
+pod/hello created
+<span class="p">$</span> kubectl get pod hello -o yaml | less   <span class="c"># see everything K8s filled in</span></pre>
+      </div>
+
+      <p>Every Kubernetes object has the same four-field skeleton: <code>apiVersion</code>, <code>kind</code>, <code>metadata</code>, <code>spec</code>. Memorize it. It never changes.</p>
+
+      <h2>Pods are mortal</h2>
+      <div class="callout warn">
+        <div class="callout-icon">WARN</div>
+        <div class="callout-body">
+          <p>If your node dies, your pod dies with it. Pods are <strong>not</strong> resilient on their own. They are designed to be replaceable. To run resilient apps, you wrap pods in a <em>Deployment</em> — that's the next lesson.</p>
+        </div>
+      </div>
+
+      <p>Try this to see for yourself:</p>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl delete pod hello
+<span class="p">$</span> kubectl get pods
+<span class="c"># gone. nothing brings it back.</span></pre>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 03</span>
+          <span class="exercise-title">Write a pod from scratch</span>
+        </div>
+        <div class="exercise-body">
+          <p>Write a YAML file <code>busybox.yaml</code> for a pod named <code>shell</code> running the image <code>busybox:latest</code> with the command <code>sleep 3600</code>. Apply it, exec into it, and run <code>wget -qO- http://google.com | head</code>.</p>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">Show Solution</button>
+        <div class="solution">
+          <div class="solution-label">// busybox.yaml</div>
+          <div class="code">
+            <div class="code-head"><span>yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Pod</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">shell</span>
+<span class="y">spec:</span>
+  <span class="y">containers:</span>
+    - <span class="y">name:</span> <span class="s">box</span>
+      <span class="y">image:</span> <span class="s">busybox:latest</span>
+      <span class="y">command:</span> [<span class="s">"sleep"</span>, <span class="s">"3600"</span>]</pre>
+          </div>
+          <div class="code">
+            <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl apply -f busybox.yaml
+<span class="p">$</span> kubectl exec -it shell -- sh
+<span class="p">/ #</span> wget -qO- http://google.com | head</pre>
+          </div>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 4: DEPLOYMENTS ===== */
+  {
+    title: "Deployments",
+    tagline: "The thing that makes pods stop dying for good. Self-healing, scalable, rolling updates included.",
+    html: `
+      <h2>The hierarchy</h2>
+      <p>You don't manage pods directly in real life. You manage Deployments. A Deployment manages a ReplicaSet. The ReplicaSet manages pods.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 620 240" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; }
+          </style>
+          <defs>
+            <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+            </marker>
+          </defs>
+          <rect x="40" y="20" width="160" height="60" rx="8" fill="#1c232c" stroke="#79c0ff"/>
+          <text class="t" x="120" y="46" text-anchor="middle">Deployment</text>
+          <text class="tm" x="120" y="64" text-anchor="middle">"3 of these, please"</text>
+
+          <rect x="230" y="20" width="160" height="60" rx="8" fill="#1c232c" stroke="#d2a8ff"/>
+          <text class="t" x="310" y="46" text-anchor="middle">ReplicaSet</text>
+          <text class="tm" x="310" y="64" text-anchor="middle">keeps count alive</text>
+
+          <rect x="430" y="0" width="160" height="36" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="510" y="22" text-anchor="middle">Pod</text>
+          <rect x="430" y="42" width="160" height="36" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="510" y="64" text-anchor="middle">Pod</text>
+          <rect x="430" y="84" width="160" height="36" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="510" y="106" text-anchor="middle">Pod</text>
+
+          <line x1="200" y1="50" x2="227" y2="50" stroke="#8b949e" marker-end="url(#ar3)"/>
+          <line x1="390" y1="50" x2="427" y2="18" stroke="#8b949e" marker-end="url(#ar3)"/>
+          <line x1="390" y1="50" x2="427" y2="60" stroke="#8b949e" marker-end="url(#ar3)"/>
+          <line x1="390" y1="50" x2="427" y2="102" stroke="#8b949e" marker-end="url(#ar3)"/>
+
+          <text class="tm" x="310" y="170" text-anchor="middle" fill="#79c0ff">→ kill a pod, ReplicaSet spawns another</text>
+          <text class="tm" x="310" y="190" text-anchor="middle" fill="#79c0ff">→ change the image, Deployment makes a new ReplicaSet</text>
+          <text class="tm" x="310" y="210" text-anchor="middle" fill="#79c0ff">→ rolls traffic over with zero downtime</text>
+        </svg>
+      </div>
+
+      <h2>Write a Deployment</h2>
+      <div class="code">
+        <div class="code-head"><span>deployment.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">apps/v1</span>
+<span class="y">kind:</span> <span class="s">Deployment</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">web</span>
+<span class="y">spec:</span>
+  <span class="y">replicas:</span> <span class="n">3</span>
+  <span class="y">selector:</span>
+    <span class="y">matchLabels:</span>
+      <span class="y">app:</span> <span class="s">web</span>
+  <span class="y">template:</span>             <span class="c"># this is a Pod template</span>
+    <span class="y">metadata:</span>
+      <span class="y">labels:</span>
+        <span class="y">app:</span> <span class="s">web</span>
+    <span class="y">spec:</span>
+      <span class="y">containers:</span>
+        - <span class="y">name:</span> <span class="s">nginx</span>
+          <span class="y">image:</span> <span class="s">nginx:1.25-alpine</span>
+          <span class="y">ports:</span>
+            - <span class="y">containerPort:</span> <span class="n">80</span>
+          <span class="y">resources:</span>
+            <span class="y">requests:</span> { <span class="y">cpu:</span> <span class="s">50m</span>, <span class="y">memory:</span> <span class="s">64Mi</span> }
+            <span class="y">limits:</span>   { <span class="y">cpu:</span> <span class="s">200m</span>, <span class="y">memory:</span> <span class="s">128Mi</span> }</pre>
+      </div>
+
+      <p>The <code>selector</code> tells the Deployment which pods it owns: "any pod with the label <code>app=web</code>". The <code>template</code> tells it what pods to create. <strong>The labels in the selector must match the labels in the template.</strong></p>
+
+      <h2>Watch it work</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl apply -f deployment.yaml
+deployment.apps/web created
+
+<span class="p">$</span> kubectl get pods -l app=web -w   <span class="c"># -w = watch</span>
+NAME                   READY   STATUS              RESTARTS   AGE
+web-6f8b9b59cf-2lqxv   0/1     ContainerCreating   0          1s
+web-6f8b9b59cf-7trzm   1/1     Running             0          3s
+web-6f8b9b59cf-bp5d8   1/1     Running             0          3s
+<span class="c"># Ctrl-C when bored</span></pre>
+      </div>
+
+      <h2>Self-healing: see it in action</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl delete pod -l app=web --field-selector=status.phase=Running --wait=false
+pod/web-6f8b9b59cf-7trzm deleted
+pod/web-6f8b9b59cf-bp5d8 deleted
+
+<span class="p">$</span> kubectl get pods -l app=web
+<span class="c"># new pods are already starting. you literally cannot kill them.</span></pre>
+      </div>
+
+      <h2>Scale</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl scale deployment/web --replicas=5
+deployment.apps/web scaled
+
+<span class="c"># or edit the YAML, change replicas, and re-apply. Same result.</span></pre>
+      </div>
+
+      <h2>Rolling update</h2>
+      <p>Change the image in <code>deployment.yaml</code> to <code>nginx:1.27-alpine</code>, re-apply, and watch:</p>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl apply -f deployment.yaml
+<span class="p">$</span> kubectl rollout status deployment/web
+Waiting for deployment "web" rollout to finish: 2 of 5 updated...
+deployment "web" successfully rolled out
+
+<span class="p">$</span> kubectl rollout history deployment/web
+<span class="p">$</span> kubectl rollout undo deployment/web   <span class="c"># oops, revert</span></pre>
+      </div>
+
+      <div class="callout info">
+        <div class="callout-icon">INFO</div>
+        <div class="callout-body">
+          <p><strong>What just happened?</strong> The Deployment created a new ReplicaSet, scaled it up while scaling the old one down, one pod at a time. Your users saw no downtime. This is the single biggest reason teams adopt Kubernetes.</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 04</span>
+          <span class="exercise-title">Break and heal</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>Scale your <code>web</code> deployment to 4 replicas.</li>
+            <li>Find one pod name and <code>kubectl delete pod &lt;name&gt;</code>. Count how many seconds until a replacement is Running.</li>
+            <li>Change the image to a typo like <code>nginx:doesnotexist</code> and re-apply. What happens? Use <code>kubectl describe deployment web</code> and <code>kubectl get pods</code> to investigate.</li>
+            <li>Roll it back with <code>kubectl rollout undo</code>.</li>
+          </ol>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">What you should see</button>
+        <div class="solution">
+          <div class="solution-label">// expected</div>
+          <p>The bad image will keep some pods stuck in <code>ImagePullBackOff</code>. The old ReplicaSet stays running because Kubernetes refuses to take down healthy pods until new ones are ready — that's the safety net. <code>rollout undo</code> reverts to the previous ReplicaSet instantly.</p>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 5: SERVICES ===== */
+  {
+    title: "Services",
+    tagline: "Pods come and go and change IPs. Services give them a stable address — and a way to talk to each other.",
+    html: `
+      <h2>The problem</h2>
+      <p>Your Deployment runs 3 nginx pods. Each pod has its own IP. Pods die and get replaced — new pods get new IPs. <strong>How does anything reliably reach your app?</strong></p>
+
+      <p>The answer: a <em>Service</em>. It's a stable virtual IP + DNS name that load-balances across all pods matching a label selector.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 620 220" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; }
+          </style>
+          <defs>
+            <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#79c0ff"/>
+            </marker>
+          </defs>
+          <rect x="20" y="80" width="120" height="60" rx="8" fill="#1c232c" stroke="#ffa657"/>
+          <text class="t" x="80" y="105" text-anchor="middle">client</text>
+          <text class="tm" x="80" y="124" text-anchor="middle">http://web</text>
+
+          <rect x="220" y="70" width="160" height="80" rx="10" fill="#161b22" stroke="#79c0ff" stroke-dasharray="4,3"/>
+          <text class="t" x="300" y="98" text-anchor="middle" fill="#79c0ff">Service: web</text>
+          <text class="tm" x="300" y="118" text-anchor="middle">stable IP + DNS</text>
+          <text class="tm" x="300" y="134" text-anchor="middle">selector: app=web</text>
+
+          <rect x="460" y="10" width="140" height="40" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="530" y="34" text-anchor="middle">pod (app=web)</text>
+          <rect x="460" y="90" width="140" height="40" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="530" y="114" text-anchor="middle">pod (app=web)</text>
+          <rect x="460" y="170" width="140" height="40" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="530" y="194" text-anchor="middle">pod (app=web)</text>
+
+          <line x1="140" y1="110" x2="218" y2="110" stroke="#79c0ff" marker-end="url(#ar4)"/>
+          <line x1="380" y1="110" x2="458" y2="30" stroke="#79c0ff" marker-end="url(#ar4)"/>
+          <line x1="380" y1="110" x2="458" y2="110" stroke="#79c0ff" marker-end="url(#ar4)"/>
+          <line x1="380" y1="110" x2="458" y2="190" stroke="#79c0ff" marker-end="url(#ar4)"/>
+        </svg>
+        <div class="diagram-caption">The Service is a label-driven load balancer with a stable name</div>
+      </div>
+
+      <h2>Service types</h2>
+      <table>
+        <thead><tr><th>Type</th><th>Where reachable</th><th>Use for</th></tr></thead>
+        <tbody>
+          <tr><td><code>ClusterIP</code></td><td>Inside cluster only (default)</td><td>Internal service-to-service traffic</td></tr>
+          <tr><td><code>NodePort</code></td><td>On every node's IP at a high port</td><td>Quick external access, dev/test</td></tr>
+          <tr><td><code>LoadBalancer</code></td><td>External IP from cloud LB</td><td>Production external traffic</td></tr>
+          <tr><td><code>ExternalName</code></td><td>DNS alias to external host</td><td>Aliasing external services</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Create a ClusterIP service</h2>
+      <div class="code">
+        <div class="code-head"><span>service.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Service</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">web</span>
+<span class="y">spec:</span>
+  <span class="y">type:</span> <span class="s">ClusterIP</span>
+  <span class="y">selector:</span>
+    <span class="y">app:</span> <span class="s">web</span>           <span class="c"># matches pods from our Deployment</span>
+  <span class="y">ports:</span>
+    - <span class="y">port:</span> <span class="n">80</span>          <span class="c"># the Service's port</span>
+      <span class="y">targetPort:</span> <span class="n">80</span>    <span class="c"># the container's port</span></pre>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl apply -f service.yaml
+<span class="p">$</span> kubectl get svc
+NAME   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+web    ClusterIP   10.96.142.18    &lt;none&gt;        80/TCP    5s
+
+<span class="c"># test it from inside the cluster</span>
+<span class="p">$</span> kubectl run tester --rm -it --image=curlimages/curl --restart=Never -- sh
+<span class="p">/ $</span> curl http://web
+<span class="b">&lt;html&gt;&lt;body&gt;Welcome to nginx!&lt;/body&gt;&lt;/html&gt;</span></pre>
+      </div>
+
+      <h2>DNS inside the cluster</h2>
+      <p>Every Service is automatically registered in cluster DNS. From any pod, you can reach it three ways:</p>
+      <ul>
+        <li><code>web</code> — same namespace</li>
+        <li><code>web.default</code> — any namespace, short form</li>
+        <li><code>web.default.svc.cluster.local</code> — fully qualified</li>
+      </ul>
+
+      <h2>Reaching the service from your laptop</h2>
+      <p>ClusterIPs are unreachable from outside. For local development, port-forward:</p>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl port-forward svc/web 8080:80
+<span class="c"># now visit http://localhost:8080 in your browser</span></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">TIP</div>
+        <div class="callout-body">
+          <p><code>port-forward</code> is your best friend during development. For production-style external access, you use either a <code>LoadBalancer</code> service (in the cloud) or an <em>Ingress</em> (covered in Lesson 8).</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 05</span>
+          <span class="exercise-title">Service discovery</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>From a <code>tester</code> pod, curl <code>http://web</code> 10 times. Then check pod logs: <code>kubectl logs -l app=web --tail=2</code>. Are requests spread across pods?</li>
+            <li>Delete the <code>web</code> Service. Try to curl again — what happens?</li>
+            <li>Recreate it but set <code>selector.app: wrong</code>. Curl again. What happens, and why?</li>
+            <li>Fix it back to <code>app: web</code>.</li>
+          </ol>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">Why</button>
+        <div class="solution">
+          <div class="solution-label">// the lesson</div>
+          <p>Step 1 shows the Service round-robins across endpoints. Step 2: DNS lookup fails — the name disappears with the Service. Step 3: the Service exists but matches zero pods, so connections get refused or hang. The Service is just a label query; if labels don't match, you get nothing.</p>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 6: CONFIG ===== */
+  {
+    title: "Config & Secrets",
+    tagline: "Twelve-factor config: separate code from configuration. Kubernetes has two purpose-built objects for this.",
+    html: `
+      <h2>ConfigMap: non-sensitive config</h2>
+      <p>A ConfigMap is a key-value store you mount into pods as environment variables or files.</p>
+
+      <div class="code">
+        <div class="code-head"><span>configmap.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">ConfigMap</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">app-config</span>
+<span class="y">data:</span>
+  <span class="y">LOG_LEVEL:</span> <span class="s">debug</span>
+  <span class="y">FEATURE_X:</span> <span class="s">"true"</span>
+  <span class="y">app.conf:</span> |
+    <span class="s">server.port=8080</span>
+    <span class="s">cache.ttl=300</span></pre>
+      </div>
+
+      <h2>Secret: sensitive config</h2>
+      <p>Same idea, but base64-encoded and treated more carefully by the system.</p>
+
+      <div class="callout warn">
+        <div class="callout-icon">WARN</div>
+        <div class="callout-body">
+          <p>Out of the box, Secrets are base64-encoded, <em>not</em> encrypted. Anyone with cluster read access can decode them. In production, enable encryption at rest, use RBAC, and consider a real secrets manager like Vault, AWS Secrets Manager, or External Secrets Operator.</p>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="c"># easiest way: let kubectl handle encoding</span>
+<span class="p">$</span> kubectl create secret generic db-creds \\
+    --from-literal=DB_USER=admin \\
+    --from-literal=DB_PASS=s3cret
+
+<span class="p">$</span> kubectl get secret db-creds -o yaml
+<span class="c"># you'll see DB_USER: YWRtaW4= (base64 of "admin")</span></pre>
+      </div>
+
+      <h2>Consuming config in a Pod</h2>
+      <div class="code">
+        <div class="code-head"><span>deployment-with-config.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">apps/v1</span>
+<span class="y">kind:</span> <span class="s">Deployment</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">api</span> }
+<span class="y">spec:</span>
+  <span class="y">replicas:</span> <span class="n">2</span>
+  <span class="y">selector:</span> { <span class="y">matchLabels:</span> { <span class="y">app:</span> <span class="s">api</span> } }
+  <span class="y">template:</span>
+    <span class="y">metadata:</span> { <span class="y">labels:</span> { <span class="y">app:</span> <span class="s">api</span> } }
+    <span class="y">spec:</span>
+      <span class="y">containers:</span>
+        - <span class="y">name:</span> <span class="s">api</span>
+          <span class="y">image:</span> <span class="s">hashicorp/http-echo:1.0</span>
+          <span class="y">args:</span> [<span class="s">"-text=hello from $(LOG_LEVEL)"</span>]
+          <span class="y">env:</span>
+            <span class="c"># single key from ConfigMap</span>
+            - <span class="y">name:</span> <span class="s">LOG_LEVEL</span>
+              <span class="y">valueFrom:</span>
+                <span class="y">configMapKeyRef:</span>
+                  <span class="y">name:</span> <span class="s">app-config</span>
+                  <span class="y">key:</span> <span class="s">LOG_LEVEL</span>
+            <span class="c"># single key from Secret</span>
+            - <span class="y">name:</span> <span class="s">DB_PASS</span>
+              <span class="y">valueFrom:</span>
+                <span class="y">secretKeyRef:</span>
+                  <span class="y">name:</span> <span class="s">db-creds</span>
+                  <span class="y">key:</span> <span class="s">DB_PASS</span>
+          <span class="c"># OR mount the whole thing as files</span>
+          <span class="y">volumeMounts:</span>
+            - <span class="y">name:</span> <span class="s">conf</span>
+              <span class="y">mountPath:</span> <span class="s">/etc/app</span>
+      <span class="y">volumes:</span>
+        - <span class="y">name:</span> <span class="s">conf</span>
+          <span class="y">configMap:</span>
+            <span class="y">name:</span> <span class="s">app-config</span></pre>
+      </div>
+
+      <p>Two patterns to remember:</p>
+      <ul>
+        <li><strong>Env vars</strong> — best for simple keys consumed at process start.</li>
+        <li><strong>File mounts</strong> — best for config files (nginx.conf, application.yaml) and apps that can hot-reload them.</li>
+      </ul>
+
+      <div class="callout info">
+        <div class="callout-icon">INFO</div>
+        <div class="callout-body">
+          <p>Changing a ConfigMap does <strong>not</strong> automatically restart pods. Env-var consumers won't notice. File mounts will eventually see updated content but apps must re-read it. Trigger a rollout to be safe: <code>kubectl rollout restart deployment/api</code>.</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 06</span>
+          <span class="exercise-title">Wire up config</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>Apply the ConfigMap, Secret, and Deployment above.</li>
+            <li><code>kubectl exec</code> into one of the api pods and run <code>env | grep -E 'LOG_LEVEL|DB_PASS'</code>. Confirm they're set.</li>
+            <li>Now <code>cat /etc/app/app.conf</code> inside the pod.</li>
+            <li>Edit the ConfigMap (<code>kubectl edit cm app-config</code>), change <code>LOG_LEVEL</code> to <code>warn</code>, save. Re-check env in the pod. What do you see?</li>
+            <li>Now <code>kubectl rollout restart deployment/api</code>, wait, and check again.</li>
+          </ol>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">Expected behavior</button>
+        <div class="solution">
+          <div class="solution-label">// expected</div>
+          <p>After step 4 the env var is still <code>debug</code> because the pod's process started with that value baked in. After step 5 you get fresh pods with the new value. The file mount, by contrast, will reflect the new content within ~60s without a restart (but your app has to re-read it).</p>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 7: STORAGE ===== */
+  {
+    title: "Storage",
+    tagline: "Pods are ephemeral. Data isn't. How to persist things in a world that loves to delete pods.",
+    html: `
+      <h2>The three layers</h2>
+      <table>
+        <thead><tr><th>Object</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>Volume</code></td><td>A directory mounted into a pod. Various backends.</td></tr>
+          <tr><td><code>PersistentVolume</code> (PV)</td><td>An actual chunk of storage the cluster knows about. Lifetime is independent of pods.</td></tr>
+          <tr><td><code>PersistentVolumeClaim</code> (PVC)</td><td>A pod's <em>request</em> for storage. Cluster matches it to a PV.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="diagram">
+        <svg viewBox="0 0 620 200" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; }
+          </style>
+          <defs>
+            <marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#79c0ff"/>
+            </marker>
+          </defs>
+          <rect x="20" y="60" width="140" height="80" rx="8" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="90" y="92" text-anchor="middle">Pod</text>
+          <text class="tm" x="90" y="112" text-anchor="middle">mounts /data</text>
+
+          <rect x="220" y="60" width="160" height="80" rx="8" fill="#1c232c" stroke="#d2a8ff"/>
+          <text class="t" x="300" y="92" text-anchor="middle">PVC</text>
+          <text class="tm" x="300" y="112" text-anchor="middle">"need 1Gi, RWO"</text>
+
+          <rect x="440" y="60" width="160" height="80" rx="8" fill="#1c232c" stroke="#ffa657"/>
+          <text class="t" x="520" y="92" text-anchor="middle">PV</text>
+          <text class="tm" x="520" y="112" text-anchor="middle">actual disk</text>
+
+          <line x1="160" y1="100" x2="218" y2="100" stroke="#79c0ff" marker-end="url(#ar5)"/>
+          <line x1="380" y1="100" x2="438" y2="100" stroke="#79c0ff" marker-end="url(#ar5)"/>
+          <text class="tm" x="190" y="92" text-anchor="middle" fill="#8b949e">uses</text>
+          <text class="tm" x="409" y="92" text-anchor="middle" fill="#8b949e">binds</text>
+        </svg>
+        <div class="diagram-caption">Pods ask for storage with a PVC; cluster fulfills it with a PV</div>
+      </div>
+
+      <p>In a real cloud, you almost never write PVs by hand. A <em>StorageClass</em> dynamically provisions them when a PVC is created (e.g., EBS volumes on AWS).</p>
+
+      <h2>Example: persistent storage</h2>
+      <div class="code">
+        <div class="code-head"><span>pvc.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">PersistentVolumeClaim</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">data</span>
+<span class="y">spec:</span>
+  <span class="y">accessModes:</span> [<span class="s">ReadWriteOnce</span>]   <span class="c"># RWO: one node mounts it for write</span>
+  <span class="y">resources:</span>
+    <span class="y">requests:</span>
+      <span class="y">storage:</span> <span class="s">1Gi</span>
+  <span class="c"># storageClassName left blank → uses default (kind provides one)</span>
+---
+<span class="y">apiVersion:</span> <span class="s">apps/v1</span>
+<span class="y">kind:</span> <span class="s">Deployment</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">writer</span> }
+<span class="y">spec:</span>
+  <span class="y">replicas:</span> <span class="n">1</span>
+  <span class="y">selector:</span> { <span class="y">matchLabels:</span> { <span class="y">app:</span> <span class="s">writer</span> } }
+  <span class="y">template:</span>
+    <span class="y">metadata:</span> { <span class="y">labels:</span> { <span class="y">app:</span> <span class="s">writer</span> } }
+    <span class="y">spec:</span>
+      <span class="y">containers:</span>
+        - <span class="y">name:</span> <span class="s">app</span>
+          <span class="y">image:</span> <span class="s">busybox</span>
+          <span class="y">command:</span> [<span class="s">"sh"</span>, <span class="s">"-c"</span>, <span class="s">"while true; do date &gt;&gt; /data/log.txt; sleep 5; done"</span>]
+          <span class="y">volumeMounts:</span>
+            - <span class="y">name:</span> <span class="s">store</span>
+              <span class="y">mountPath:</span> <span class="s">/data</span>
+      <span class="y">volumes:</span>
+        - <span class="y">name:</span> <span class="s">store</span>
+          <span class="y">persistentVolumeClaim:</span>
+            <span class="y">claimName:</span> <span class="s">data</span></pre>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl apply -f pvc.yaml
+<span class="p">$</span> kubectl get pvc,pv
+<span class="p">$</span> kubectl exec deploy/writer -- tail /data/log.txt
+<span class="p">$</span> kubectl delete pod -l app=writer    <span class="c"># pod dies</span>
+<span class="p">$</span> kubectl exec deploy/writer -- tail /data/log.txt
+<span class="c"># the new pod sees the old data. that's the point.</span></pre>
+      </div>
+
+      <h2>When to use StatefulSet</h2>
+      <p>For databases and anything where pod identity matters (stable names, ordered startup, per-pod storage), use a <code>StatefulSet</code> instead of a Deployment. Same idea but with stickier guarantees. Use a managed database in production whenever possible.</p>
+
+      <div class="callout tip">
+        <div class="callout-icon">TIP</div>
+        <div class="callout-body">
+          <p>Running databases <em>on</em> Kubernetes is harder than running them next to it. For a starting team, prefer managed databases (RDS, Cloud SQL, Neon) and let K8s handle your stateless workloads.</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 07</span>
+          <span class="exercise-title">Survive death</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>Apply the PVC + writer Deployment.</li>
+            <li>After ~30 seconds, exec in and <code>wc -l /data/log.txt</code>. Note the count.</li>
+            <li>Delete the pod. Wait for the new one. Re-check the line count — it should keep growing.</li>
+            <li>Now delete the Deployment <em>and</em> the PVC. Recreate them. Is the log still there? Why or why not?</li>
+          </ol>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">Why</button>
+        <div class="solution">
+          <div class="solution-label">// expected</div>
+          <p>After step 4 the data is gone. The PVC's lifecycle is what protects the data — deleting it (depending on the <em>reclaim policy</em> on the underlying PV) frees the volume. Deployments are stateless; the PVC is the state.</p>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 8: INGRESS ===== */
+  {
+    title: "Ingress",
+    tagline: "One door for the whole cluster. Route by hostname and path. The way real apps get exposed.",
+    html: `
+      <h2>Why Ingress</h2>
+      <p>Exposing every Service with a <code>LoadBalancer</code> means one cloud LB (and one bill) per service. <strong>Ingress</strong> is a single entry point that routes requests to the right Service based on the URL.</p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 620 240" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; }
+          </style>
+          <defs>
+            <marker id="ar6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#79c0ff"/>
+            </marker>
+          </defs>
+          <rect x="20" y="100" width="120" height="50" rx="6" fill="#1c232c" stroke="#ffa657"/>
+          <text class="t" x="80" y="130" text-anchor="middle">Internet</text>
+
+          <rect x="190" y="90" width="160" height="70" rx="10" fill="#161b22" stroke="#79c0ff" stroke-dasharray="4,3"/>
+          <text class="t" x="270" y="118" text-anchor="middle" fill="#79c0ff">Ingress Controller</text>
+          <text class="tm" x="270" y="138" text-anchor="middle">nginx/traefik etc.</text>
+
+          <rect x="430" y="20" width="160" height="50" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="510" y="40" text-anchor="middle">svc: api</text>
+          <text class="tm" x="510" y="58" text-anchor="middle">api.example.com</text>
+
+          <rect x="430" y="100" width="160" height="50" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="510" y="120" text-anchor="middle">svc: web</text>
+          <text class="tm" x="510" y="138" text-anchor="middle">/</text>
+
+          <rect x="430" y="180" width="160" height="50" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="510" y="200" text-anchor="middle">svc: admin</text>
+          <text class="tm" x="510" y="218" text-anchor="middle">/admin</text>
+
+          <line x1="140" y1="125" x2="188" y2="125" stroke="#79c0ff" marker-end="url(#ar6)"/>
+          <line x1="350" y1="125" x2="428" y2="45" stroke="#79c0ff" marker-end="url(#ar6)"/>
+          <line x1="350" y1="125" x2="428" y2="125" stroke="#79c0ff" marker-end="url(#ar6)"/>
+          <line x1="350" y1="125" x2="428" y2="205" stroke="#79c0ff" marker-end="url(#ar6)"/>
+        </svg>
+        <div class="diagram-caption">One ingress controller fans traffic out by host or path</div>
+      </div>
+
+      <h2>The two pieces</h2>
+      <ul>
+        <li><strong>Ingress Controller</strong> — the actual proxy (nginx-ingress, Traefik, etc.). You install it once per cluster. It runs as pods.</li>
+        <li><strong>Ingress resource</strong> — a YAML object you write that tells the controller "for host X path Y, send to Service Z".</li>
+      </ul>
+
+      <h2>Install the nginx ingress controller (on kind)</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="c"># recreate the cluster with port mappings so it can receive HTTP</span>
+<span class="p">$</span> kind delete cluster --name k8s-101
+<span class="p">$</span> cat &lt;&lt;EOF | kind create cluster --name k8s-101 --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - { containerPort: 80,  hostPort: 80,  protocol: TCP }
+      - { containerPort: 443, hostPort: 443, protocol: TCP }
+EOF
+
+<span class="p">$</span> kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+<span class="p">$</span> kubectl wait --namespace ingress-nginx \\
+    --for=condition=ready pod --selector=app.kubernetes.io/component=controller \\
+    --timeout=180s</pre>
+      </div>
+
+      <h2>Define an Ingress</h2>
+      <div class="code">
+        <div class="code-head"><span>ingress.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">networking.k8s.io/v1</span>
+<span class="y">kind:</span> <span class="s">Ingress</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">app</span>
+<span class="y">spec:</span>
+  <span class="y">ingressClassName:</span> <span class="s">nginx</span>
+  <span class="y">rules:</span>
+    - <span class="y">host:</span> <span class="s">app.localtest.me</span>     <span class="c"># resolves to 127.0.0.1 for free</span>
+      <span class="y">http:</span>
+        <span class="y">paths:</span>
+          - <span class="y">path:</span> <span class="s">/api</span>
+            <span class="y">pathType:</span> <span class="s">Prefix</span>
+            <span class="y">backend:</span>
+              <span class="y">service:</span>
+                <span class="y">name:</span> <span class="s">api</span>
+                <span class="y">port:</span> { <span class="y">number:</span> <span class="n">80</span> }
+          - <span class="y">path:</span> <span class="s">/</span>
+            <span class="y">pathType:</span> <span class="s">Prefix</span>
+            <span class="y">backend:</span>
+              <span class="y">service:</span>
+                <span class="y">name:</span> <span class="s">web</span>
+                <span class="y">port:</span> { <span class="y">number:</span> <span class="n">80</span> }</pre>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl apply -f ingress.yaml
+<span class="p">$</span> curl http://app.localtest.me/         <span class="c"># → web service</span>
+<span class="p">$</span> curl http://app.localtest.me/api      <span class="c"># → api service</span></pre>
+      </div>
+
+      <div class="callout info">
+        <div class="callout-icon">INFO</div>
+        <div class="callout-body">
+          <p><code>localtest.me</code> and its subdomains all resolve to <code>127.0.0.1</code> publicly — a free way to test virtual hosts without editing <code>/etc/hosts</code>.</p>
+        </div>
+      </div>
+
+      <h2>TLS, briefly</h2>
+      <p>In production you add a TLS section pointing at a Secret containing the cert + key, and run <strong>cert-manager</strong> to auto-provision Let's Encrypt certs. We'll skip the details here — same shape, more YAML.</p>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 08</span>
+          <span class="exercise-title">Two apps, one door</span>
+        </div>
+        <div class="exercise-body">
+          <p>Deploy a second service. Run an extra http-echo Deployment + Service named <code>bye</code> that responds "goodbye world". Add a second Ingress rule (or another path on the existing one) so that:</p>
+          <ul>
+            <li><code>http://app.localtest.me/</code> → web</li>
+            <li><code>http://app.localtest.me/bye</code> → bye</li>
+          </ul>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">Show Solution</button>
+        <div class="solution">
+          <div class="solution-label">// bye.yaml</div>
+          <div class="code">
+            <div class="code-head"><span>yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">apps/v1</span>
+<span class="y">kind:</span> <span class="s">Deployment</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">bye</span> }
+<span class="y">spec:</span>
+  <span class="y">replicas:</span> <span class="n">1</span>
+  <span class="y">selector:</span> { <span class="y">matchLabels:</span> { <span class="y">app:</span> <span class="s">bye</span> } }
+  <span class="y">template:</span>
+    <span class="y">metadata:</span> { <span class="y">labels:</span> { <span class="y">app:</span> <span class="s">bye</span> } }
+    <span class="y">spec:</span>
+      <span class="y">containers:</span>
+        - <span class="y">name:</span> <span class="s">echo</span>
+          <span class="y">image:</span> <span class="s">hashicorp/http-echo:1.0</span>
+          <span class="y">args:</span> [<span class="s">"-text=goodbye world"</span>]
+          <span class="y">ports:</span> [{ <span class="y">containerPort:</span> <span class="n">5678</span> }]
+---
+<span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Service</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">bye</span> }
+<span class="y">spec:</span>
+  <span class="y">selector:</span> { <span class="y">app:</span> <span class="s">bye</span> }
+  <span class="y">ports:</span> [{ <span class="y">port:</span> <span class="n">80</span>, <span class="y">targetPort:</span> <span class="n">5678</span> }]</pre>
+          </div>
+          <p>Then add a path block in your Ingress with <code>path: /bye</code>, <code>pathType: Prefix</code>, backend service name <code>bye</code>, port 80.</p>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 9: NAMESPACES ===== */
+  {
+    title: "Namespaces & Limits",
+    tagline: "Organizing the cluster and stopping any one team (or bug) from eating it alive.",
+    html: `
+      <h2>Namespaces</h2>
+      <p>Namespaces are virtual partitions of a cluster. They scope names (you can have <code>web</code> in <code>dev</code> and <code>web</code> in <code>prod</code>), enable per-team RBAC, and let you apply resource quotas.</p>
+
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl get ns
+NAME              STATUS   AGE
+default           Active   2h
+kube-system       Active   2h
+kube-public       Active   2h
+ingress-nginx     Active   1h
+
+<span class="p">$</span> kubectl create namespace dev
+<span class="p">$</span> kubectl create namespace prod
+<span class="p">$</span> kubectl apply -f deployment.yaml -n dev
+<span class="p">$</span> kubectl get pods -n dev</pre>
+      </div>
+
+      <h3>Set a default namespace for your context</h3>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl config set-context --current --namespace=dev
+<span class="c"># now &#96;kubectl get pods&#96; is implicitly in dev</span></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">TIP</div>
+        <div class="callout-body">
+          <p>Install <code>kubectx</code> and <code>kubens</code>. They're tiny CLIs for switching contexts and namespaces. Worth the 30-second install.</p>
+        </div>
+      </div>
+
+      <h2>Resource requests and limits</h2>
+      <p>Every container should declare what it <em>needs</em> (requests) and what it's <em>capped at</em> (limits).</p>
+      <ul>
+        <li><strong>request</strong> is what the scheduler uses to place the pod. It's a reservation.</li>
+        <li><strong>limit</strong> is the hard ceiling. CPU gets throttled; memory gets OOM-killed.</li>
+      </ul>
+
+      <div class="diagram">
+        <svg viewBox="0 0 580 180" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 11px "JetBrains Mono", monospace; fill: #8b949e; }
+          </style>
+          <rect x="40" y="50" width="500" height="60" rx="6" fill="#1c232c" stroke="#30363d"/>
+          <rect x="40" y="50" width="120" height="60" rx="6" fill="#7ee787" opacity="0.2" stroke="#7ee787"/>
+          <rect x="160" y="50" width="240" height="60" fill="#e3b341" opacity="0.15" stroke="#e3b341"/>
+          <rect x="400" y="50" width="140" height="60" rx="0" fill="#ff7b72" opacity="0.15" stroke="#ff7b72"/>
+
+          <text class="tm" x="100" y="40" text-anchor="middle" fill="#7ee787">guaranteed</text>
+          <text class="t"  x="100" y="86" text-anchor="middle">request</text>
+          <text class="tm" x="280" y="40" text-anchor="middle" fill="#e3b341">elastic / burst</text>
+          <text class="t"  x="280" y="86" text-anchor="middle">between request &amp; limit</text>
+          <text class="tm" x="470" y="40" text-anchor="middle" fill="#ff7b72">denied</text>
+          <text class="t"  x="470" y="86" text-anchor="middle">above limit</text>
+
+          <text class="tm" x="160" y="135" text-anchor="middle">↑ request</text>
+          <text class="tm" x="400" y="135" text-anchor="middle">↑ limit</text>
+        </svg>
+        <div class="diagram-caption">Request = guaranteed floor · Limit = absolute ceiling</div>
+      </div>
+
+      <h3>How to express resources</h3>
+      <ul>
+        <li><strong>CPU</strong>: <code>1</code> = 1 full core. <code>500m</code> = half a core. <code>100m</code> = 10% of a core.</li>
+        <li><strong>Memory</strong>: <code>128Mi</code> = 128 mebibytes. <code>1Gi</code> = 1 gibibyte.</li>
+      </ul>
+
+      <h2>ResourceQuota: cap a whole namespace</h2>
+      <div class="code">
+        <div class="code-head"><span>quota.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">ResourceQuota</span>
+<span class="y">metadata:</span>
+  <span class="y">name:</span> <span class="s">dev-quota</span>
+  <span class="y">namespace:</span> <span class="s">dev</span>
+<span class="y">spec:</span>
+  <span class="y">hard:</span>
+    <span class="y">requests.cpu:</span> <span class="s">"2"</span>
+    <span class="y">requests.memory:</span> <span class="s">4Gi</span>
+    <span class="y">limits.cpu:</span> <span class="s">"4"</span>
+    <span class="y">limits.memory:</span> <span class="s">8Gi</span>
+    <span class="y">pods:</span> <span class="s">"20"</span></pre>
+      </div>
+
+      <h2>Health checks: liveness, readiness, startup</h2>
+      <p>Three probes Kubernetes uses to know if your pod is OK:</p>
+      <table>
+        <thead><tr><th>Probe</th><th>What happens on failure</th></tr></thead>
+        <tbody>
+          <tr><td><code>liveness</code></td><td>Pod is restarted</td></tr>
+          <tr><td><code>readiness</code></td><td>Pod is removed from Service endpoints (no traffic) until healthy</td></tr>
+          <tr><td><code>startup</code></td><td>Suppresses the other two while a slow app boots</td></tr>
+        </tbody>
+      </table>
+
+      <div class="code">
+        <div class="code-head"><span>yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">containers:</span>
+  - <span class="y">name:</span> <span class="s">api</span>
+    <span class="y">image:</span> <span class="s">my-api:1.0</span>
+    <span class="y">readinessProbe:</span>
+      <span class="y">httpGet:</span> { <span class="y">path:</span> <span class="s">/healthz</span>, <span class="y">port:</span> <span class="n">8080</span> }
+      <span class="y">periodSeconds:</span> <span class="n">5</span>
+    <span class="y">livenessProbe:</span>
+      <span class="y">httpGet:</span> { <span class="y">path:</span> <span class="s">/healthz</span>, <span class="y">port:</span> <span class="n">8080</span> }
+      <span class="y">periodSeconds:</span> <span class="n">10</span>
+      <span class="y">failureThreshold:</span> <span class="n">3</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-icon">WARN</div>
+        <div class="callout-body">
+          <p>Don't make liveness probes too aggressive. A pod that's slow under load can get restarted into a loop, making things worse. Start with readiness; only add liveness if you actually have a "process is stuck" failure mode.</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Exercise · 09</span>
+          <span class="exercise-title">Quota in action</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>Apply the quota above to the <code>dev</code> namespace.</li>
+            <li>Try to apply a Deployment with <code>replicas: 25</code> into <code>dev</code>. What happens?</li>
+            <li>Try to apply a Deployment with no <code>resources</code> block at all. What does the API server tell you, and why?</li>
+          </ol>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">Why</button>
+        <div class="solution">
+          <div class="solution-label">// expected</div>
+          <p>Step 2 fails at 21 pods — the quota is enforced. Step 3 fails because, once a ResourceQuota is in place that constrains <code>requests.cpu</code> or <code>requests.memory</code>, every pod in the namespace <strong>must</strong> declare matching resource fields. The cluster won't let you create unbounded workloads in a quota'd namespace.</p>
+        </div>
+      </div>
+    `
+  },
+
+  /* ===== LESSON 10: CAPSTONE ===== */
+  {
+    title: "Capstone",
+    tagline: "Deploy a real full-stack app: React frontend, Node API, Postgres. End-to-end on your laptop cluster.",
+    html: `
+      <h2>What we're building</h2>
+      <div class="diagram">
+        <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .t { font: 600 13px "Inter", sans-serif; fill: #e6edf3; }
+            .tm { font: 500 10px "JetBrains Mono", monospace; fill: #8b949e; }
+          </style>
+          <defs>
+            <marker id="ar7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#79c0ff"/>
+            </marker>
+          </defs>
+          <rect x="20" y="100" width="100" height="50" rx="6" fill="#1c232c" stroke="#ffa657"/>
+          <text class="t" x="70" y="130" text-anchor="middle">browser</text>
+
+          <rect x="160" y="90" width="140" height="70" rx="10" fill="#161b22" stroke="#79c0ff" stroke-dasharray="4,3"/>
+          <text class="t" x="230" y="118" text-anchor="middle" fill="#79c0ff">Ingress</text>
+          <text class="tm" x="230" y="138" text-anchor="middle">/ → web · /api → api</text>
+
+          <rect x="340" y="20" width="120" height="50" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="400" y="50" text-anchor="middle">svc: web</text>
+
+          <rect x="340" y="100" width="120" height="50" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="400" y="130" text-anchor="middle">svc: api</text>
+
+          <rect x="340" y="180" width="120" height="50" rx="6" fill="#1c232c" stroke="#d2a8ff"/>
+          <text class="t" x="400" y="210" text-anchor="middle">svc: db</text>
+
+          <rect x="500" y="100" width="120" height="50" rx="6" fill="#1c232c" stroke="#7ee787"/>
+          <text class="t" x="560" y="130" text-anchor="middle">deployment</text>
+
+          <rect x="500" y="180" width="120" height="50" rx="6" fill="#1c232c" stroke="#d2a8ff"/>
+          <text class="t" x="560" y="210" text-anchor="middle">statefulset+PVC</text>
+
+          <line x1="120" y1="125" x2="158" y2="125" stroke="#79c0ff" marker-end="url(#ar7)"/>
+          <line x1="300" y1="125" x2="338" y2="45" stroke="#79c0ff" marker-end="url(#ar7)"/>
+          <line x1="300" y1="125" x2="338" y2="125" stroke="#79c0ff" marker-end="url(#ar7)"/>
+          <line x1="460" y1="125" x2="498" y2="125" stroke="#8b949e" marker-end="url(#ar7)"/>
+          <line x1="460" y1="205" x2="498" y2="205" stroke="#8b949e" marker-end="url(#ar7)"/>
+          <line x1="400" y1="150" x2="400" y2="178" stroke="#d2a8ff" stroke-dasharray="3,2"/>
+        </svg>
+        <div class="diagram-caption">A canonical three-tier app, the K8s way</div>
+      </div>
+
+      <p>We'll wire up:</p>
+      <ul>
+        <li><strong>db</strong> — Postgres as a StatefulSet with a PVC</li>
+        <li><strong>api</strong> — a tiny Node API as a Deployment, reading DB creds from a Secret</li>
+        <li><strong>web</strong> — nginx serving a static page that calls <code>/api</code></li>
+        <li><strong>Ingress</strong> — routing <code>/</code> and <code>/api</code> to the right Services</li>
+      </ul>
+
+      <h2>One file: <code>app.yaml</code></h2>
+      <p>You can split this into multiple files in real life. For learning, one file makes the relationships clearer.</p>
+
+      <div class="code">
+        <div class="code-head"><span>app.yaml · part 1: db</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Secret</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">db-creds</span> }
+<span class="y">stringData:</span>
+  <span class="y">POSTGRES_USER:</span> <span class="s">app</span>
+  <span class="y">POSTGRES_PASSWORD:</span> <span class="s">supersecret</span>
+  <span class="y">POSTGRES_DB:</span> <span class="s">app</span>
+---
+<span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Service</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">db</span> }
+<span class="y">spec:</span>
+  <span class="y">clusterIP:</span> <span class="s">None</span>     <span class="c"># headless: lets StatefulSet pods get stable DNS</span>
+  <span class="y">selector:</span> { <span class="y">app:</span> <span class="s">db</span> }
+  <span class="y">ports:</span> [{ <span class="y">port:</span> <span class="n">5432</span> }]
+---
+<span class="y">apiVersion:</span> <span class="s">apps/v1</span>
+<span class="y">kind:</span> <span class="s">StatefulSet</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">db</span> }
+<span class="y">spec:</span>
+  <span class="y">serviceName:</span> <span class="s">db</span>
+  <span class="y">replicas:</span> <span class="n">1</span>
+  <span class="y">selector:</span> { <span class="y">matchLabels:</span> { <span class="y">app:</span> <span class="s">db</span> } }
+  <span class="y">template:</span>
+    <span class="y">metadata:</span> { <span class="y">labels:</span> { <span class="y">app:</span> <span class="s">db</span> } }
+    <span class="y">spec:</span>
+      <span class="y">containers:</span>
+        - <span class="y">name:</span> <span class="s">postgres</span>
+          <span class="y">image:</span> <span class="s">postgres:16-alpine</span>
+          <span class="y">envFrom:</span> [{ <span class="y">secretRef:</span> { <span class="y">name:</span> <span class="s">db-creds</span> } }]
+          <span class="y">ports:</span> [{ <span class="y">containerPort:</span> <span class="n">5432</span> }]
+          <span class="y">volumeMounts:</span>
+            - <span class="y">name:</span> <span class="s">data</span>
+              <span class="y">mountPath:</span> <span class="s">/var/lib/postgresql/data</span>
+          <span class="y">readinessProbe:</span>
+            <span class="y">exec:</span> { <span class="y">command:</span> [<span class="s">"pg_isready"</span>, <span class="s">"-U"</span>, <span class="s">"app"</span>] }
+            <span class="y">periodSeconds:</span> <span class="n">5</span>
+  <span class="y">volumeClaimTemplates:</span>
+    - <span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">data</span> }
+      <span class="y">spec:</span>
+        <span class="y">accessModes:</span> [<span class="s">ReadWriteOnce</span>]
+        <span class="y">resources:</span> { <span class="y">requests:</span> { <span class="y">storage:</span> <span class="s">1Gi</span> } }</pre>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>app.yaml · part 2: api</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">ConfigMap</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">api-src</span> }
+<span class="y">data:</span>
+  <span class="y">server.js:</span> |
+    <span class="s">const http = require("http");</span>
+    <span class="s">const { Client } = require("pg");</span>
+    <span class="s">const s = http.createServer(async (req, res) =&gt; {</span>
+    <span class="s">  if (req.url === "/healthz") return res.end("ok");</span>
+    <span class="s">  const c = new Client();</span>
+    <span class="s">  try { await c.connect(); const r = await c.query("select now()");</span>
+    <span class="s">    res.setHeader("Content-Type","application/json");</span>
+    <span class="s">    res.end(JSON.stringify({ time: r.rows[0].now, pod: process.env.HOSTNAME }));</span>
+    <span class="s">  } catch (e) { res.statusCode = 500; res.end(String(e)); }</span>
+    <span class="s">  finally { await c.end(); }</span>
+    <span class="s">});</span>
+    <span class="s">s.listen(8080, () =&gt; console.log("api up"));</span>
+---
+<span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Service</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">api</span> }
+<span class="y">spec:</span>
+  <span class="y">selector:</span> { <span class="y">app:</span> <span class="s">api</span> }
+  <span class="y">ports:</span> [{ <span class="y">port:</span> <span class="n">80</span>, <span class="y">targetPort:</span> <span class="n">8080</span> }]
+---
+<span class="y">apiVersion:</span> <span class="s">apps/v1</span>
+<span class="y">kind:</span> <span class="s">Deployment</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">api</span> }
+<span class="y">spec:</span>
+  <span class="y">replicas:</span> <span class="n">2</span>
+  <span class="y">selector:</span> { <span class="y">matchLabels:</span> { <span class="y">app:</span> <span class="s">api</span> } }
+  <span class="y">template:</span>
+    <span class="y">metadata:</span> { <span class="y">labels:</span> { <span class="y">app:</span> <span class="s">api</span> } }
+    <span class="y">spec:</span>
+      <span class="y">containers:</span>
+        - <span class="y">name:</span> <span class="s">api</span>
+          <span class="y">image:</span> <span class="s">node:20-alpine</span>
+          <span class="y">workingDir:</span> <span class="s">/app</span>
+          <span class="y">command:</span> [<span class="s">"sh"</span>, <span class="s">"-c"</span>, <span class="s">"npm i -y pg &amp;&amp; node /src/server.js"</span>]
+          <span class="y">env:</span>
+            - { <span class="y">name:</span> <span class="s">PGHOST</span>,     <span class="y">value:</span> <span class="s">db</span> }
+            - { <span class="y">name:</span> <span class="s">PGPORT</span>,     <span class="y">value:</span> <span class="s">"5432"</span> }
+            - { <span class="y">name:</span> <span class="s">PGUSER</span>,     <span class="y">valueFrom:</span> { <span class="y">secretKeyRef:</span> { <span class="y">name:</span> <span class="s">db-creds</span>, <span class="y">key:</span> <span class="s">POSTGRES_USER</span> } } }
+            - { <span class="y">name:</span> <span class="s">PGPASSWORD</span>, <span class="y">valueFrom:</span> { <span class="y">secretKeyRef:</span> { <span class="y">name:</span> <span class="s">db-creds</span>, <span class="y">key:</span> <span class="s">POSTGRES_PASSWORD</span> } } }
+            - { <span class="y">name:</span> <span class="s">PGDATABASE</span>, <span class="y">valueFrom:</span> { <span class="y">secretKeyRef:</span> { <span class="y">name:</span> <span class="s">db-creds</span>, <span class="y">key:</span> <span class="s">POSTGRES_DB</span> } } }
+          <span class="y">ports:</span> [{ <span class="y">containerPort:</span> <span class="n">8080</span> }]
+          <span class="y">readinessProbe:</span>
+            <span class="y">httpGet:</span> { <span class="y">path:</span> <span class="s">/healthz</span>, <span class="y">port:</span> <span class="n">8080</span> }
+          <span class="y">volumeMounts:</span>
+            - { <span class="y">name:</span> <span class="s">src</span>, <span class="y">mountPath:</span> <span class="s">/src</span> }
+      <span class="y">volumes:</span>
+        - <span class="y">name:</span> <span class="s">src</span>
+          <span class="y">configMap:</span> { <span class="y">name:</span> <span class="s">api-src</span> }</pre>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>app.yaml · part 3: web + ingress</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">ConfigMap</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">web-html</span> }
+<span class="y">data:</span>
+  <span class="y">index.html:</span> |
+    <span class="s">&lt;!doctype html&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;K8s 101&lt;/title&gt;</span>
+    <span class="s">&lt;h1&gt;Hello from the cluster&lt;/h1&gt;</span>
+    <span class="s">&lt;pre id="out"&gt;loading…&lt;/pre&gt;</span>
+    <span class="s">&lt;script&gt;</span>
+    <span class="s">fetch("/api").then(r =&gt; r.json()).then(j =&gt;</span>
+    <span class="s">  document.getElementById("out").textContent = JSON.stringify(j, null, 2));</span>
+    <span class="s">&lt;/script&gt;</span>
+---
+<span class="y">apiVersion:</span> <span class="s">v1</span>
+<span class="y">kind:</span> <span class="s">Service</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">web</span> }
+<span class="y">spec:</span>
+  <span class="y">selector:</span> { <span class="y">app:</span> <span class="s">web</span> }
+  <span class="y">ports:</span> [{ <span class="y">port:</span> <span class="n">80</span>, <span class="y">targetPort:</span> <span class="n">80</span> }]
+---
+<span class="y">apiVersion:</span> <span class="s">apps/v1</span>
+<span class="y">kind:</span> <span class="s">Deployment</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">web</span> }
+<span class="y">spec:</span>
+  <span class="y">replicas:</span> <span class="n">2</span>
+  <span class="y">selector:</span> { <span class="y">matchLabels:</span> { <span class="y">app:</span> <span class="s">web</span> } }
+  <span class="y">template:</span>
+    <span class="y">metadata:</span> { <span class="y">labels:</span> { <span class="y">app:</span> <span class="s">web</span> } }
+    <span class="y">spec:</span>
+      <span class="y">containers:</span>
+        - <span class="y">name:</span> <span class="s">nginx</span>
+          <span class="y">image:</span> <span class="s">nginx:alpine</span>
+          <span class="y">ports:</span> [{ <span class="y">containerPort:</span> <span class="n">80</span> }]
+          <span class="y">volumeMounts:</span>
+            - { <span class="y">name:</span> <span class="s">html</span>, <span class="y">mountPath:</span> <span class="s">/usr/share/nginx/html</span> }
+      <span class="y">volumes:</span>
+        - <span class="y">name:</span> <span class="s">html</span>
+          <span class="y">configMap:</span> { <span class="y">name:</span> <span class="s">web-html</span> }
+---
+<span class="y">apiVersion:</span> <span class="s">networking.k8s.io/v1</span>
+<span class="y">kind:</span> <span class="s">Ingress</span>
+<span class="y">metadata:</span> { <span class="y">name:</span> <span class="s">app</span> }
+<span class="y">spec:</span>
+  <span class="y">ingressClassName:</span> <span class="s">nginx</span>
+  <span class="y">rules:</span>
+    - <span class="y">host:</span> <span class="s">app.localtest.me</span>
+      <span class="y">http:</span>
+        <span class="y">paths:</span>
+          - { <span class="y">path:</span> <span class="s">/api</span>, <span class="y">pathType:</span> <span class="s">Prefix</span>, <span class="y">backend:</span> { <span class="y">service:</span> { <span class="y">name:</span> <span class="s">api</span>, <span class="y">port:</span> { <span class="y">number:</span> <span class="n">80</span> } } } }
+          - { <span class="y">path:</span> <span class="s">/</span>,    <span class="y">pathType:</span> <span class="s">Prefix</span>, <span class="y">backend:</span> { <span class="y">service:</span> { <span class="y">name:</span> <span class="s">web</span>, <span class="y">port:</span> { <span class="y">number:</span> <span class="n">80</span> } } } }</pre>
+      </div>
+
+      <h2>Deploy it</h2>
+      <div class="code">
+        <div class="code-head"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kubectl apply -f app.yaml
+<span class="p">$</span> kubectl get all
+<span class="p">$</span> kubectl rollout status deploy/api
+<span class="p">$</span> kubectl rollout status deploy/web
+
+<span class="c"># open it</span>
+<span class="p">$</span> open http://app.localtest.me   <span class="c"># or curl it</span></pre>
+      </div>
+
+      <p>You should see the page load, then JS fetch <code>/api</code>, hit the API pod, which queries Postgres and returns the current time + the pod name. Refresh and you'll see the pod name change as the Service round-robins.</p>
+
+      <h2>Final exercises</h2>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Capstone · A</span>
+          <span class="exercise-title">Scale the API and prove it</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>Scale <code>deploy/api</code> to 5 replicas.</li>
+            <li>Hit <code>http://app.localtest.me/api</code> in a loop — <code>for i in {1..20}; do curl -s http://app.localtest.me/api; echo; done</code>.</li>
+            <li>Count how many distinct <code>pod</code> values appear in the responses.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Capstone · B</span>
+          <span class="exercise-title">Survive a rolling update</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>Open one terminal running <code>while true; do curl -s -o /dev/null -w "%{http_code}\\n" http://app.localtest.me/api; sleep 0.2; done</code>.</li>
+            <li>In another terminal, edit the API ConfigMap (<code>kubectl edit cm api-src</code>) to add a new response field. Then <code>kubectl rollout restart deploy/api</code>.</li>
+            <li>Watch the loop. Did you see any non-200s? Why or why not?</li>
+          </ol>
+        </div>
+        <button class="reveal-btn" onclick="toggleSolution(this)">What to look for</button>
+        <div class="solution">
+          <div class="solution-label">// expected</div>
+          <p>With <code>replicas: 5</code> and a readiness probe, the Service should remove pods from the load-balancer pool while they restart and add them back once ready. You should see only 200s. If you forced <code>replicas: 1</code>, you'd see a brief gap — proving why multi-replica deployments are non-negotiable for zero-downtime.</p>
+        </div>
+      </div>
+
+      <div class="exercise">
+        <div class="exercise-head">
+          <span class="exercise-badge">Capstone · C</span>
+          <span class="exercise-title">Kill the database and watch what happens</span>
+        </div>
+        <div class="exercise-body">
+          <ol>
+            <li>Delete the StatefulSet pod: <code>kubectl delete pod db-0</code>.</li>
+            <li>Watch <code>kubectl get pods -w</code>. The pod comes back with the same name.</li>
+            <li>Hit the API. What error do you see during the brief outage? When the DB returns, does the API auto-recover, or did you need to restart it?</li>
+            <li>Bonus: delete the PVC <em>and</em> the StatefulSet, recreate them. What happens to your data?</li>
+          </ol>
+        </div>
+      </div>
+
+      <h2>Where to go next</h2>
+      <ul>
+        <li><strong>Helm</strong> — package manager for K8s. Turns this YAML soup into reusable, parameterized charts.</li>
+        <li><strong>Kustomize</strong> — built into kubectl. Overlay-based config for dev/staging/prod.</li>
+        <li><strong>Observability</strong> — Prometheus for metrics, Loki/Grafana for logs, OpenTelemetry for traces.</li>
+        <li><strong>GitOps</strong> — Argo CD or Flux. Your git repo becomes the source of truth; the cluster reconciles itself.</li>
+        <li><strong>Production clouds</strong> — EKS / GKE / AKS. Same APIs, plus IAM, autoscaling, managed networking.</li>
+        <li><strong>The docs</strong> — <code>kubernetes.io/docs</code> is genuinely excellent reference material.</li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-icon">END</div>
+        <div class="callout-body">
+          <p>You started knowing zero. You now have a real cluster running a real three-tier app you can break and heal at will. Everything else is variations on the same primitives: <em>pods, controllers, services, config, storage</em>. Build from here.</p>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span>cleanup</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><span class="p">$</span> kind delete cluster --name k8s-101</pre>
+      </div>
+    `
+  }
+];
+
+/* ============================================
+   RENDER + NAV
+   ============================================ */
+let current = 0;
+
+function renderNav() {
+  const nav = document.getElementById("nav-list");
+  nav.innerHTML = lessons.map((l, i) =>
+    `<li><a href="#" data-i="${i}" class="${i === current ? "active" : ""}">${l.title}</a></li>`
+  ).join("");
+  nav.querySelectorAll("a").forEach(a => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      go(parseInt(a.dataset.i, 10));
+    });
+  });
+}
+
+function renderLesson() {
+  const l = lessons[current];
+  const prevDisabled = current === 0 ? "disabled" : "";
+  const nextDisabled = current === lessons.length - 1 ? "disabled" : "";
+  const prevTitle = current === 0 ? "" : lessons[current - 1].title;
+  const nextTitle = current === lessons.length - 1 ? "" : lessons[current + 1].title;
+
+  document.getElementById("content").innerHTML = `
+    <section class="lesson visible">
+      <div class="lesson-header">
+        <div class="lesson-num">Lesson ${String(current + 1).padStart(2, "0")} / ${String(lessons.length).padStart(2, "0")}</div>
+        <h1>${l.title}</h1>
+        <p class="lesson-tagline">${l.tagline}</p>
+      </div>
+      ${l.html}
+      <div class="lesson-footer">
+        <button class="nav-btn prev" ${prevDisabled} onclick="go(${current - 1})">
+          <span class="nav-btn-label">← Previous</span>
+          <span class="nav-btn-title">${prevTitle || "—"}</span>
+        </button>
+        <button class="nav-btn next" ${nextDisabled} onclick="go(${current + 1})">
+          <span class="nav-btn-label">Next →</span>
+          <span class="nav-btn-title">${nextTitle || "—"}</span>
+        </button>
+      </div>
+    </section>
+  `;
+  document.getElementById("progress").style.width = ((current + 1) / lessons.length * 100) + "%";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function go(i) {
+  if (i < 0 || i >= lessons.length) return;
+  current = i;
+  renderNav();
+  renderLesson();
+}
+
+function copyCode(btn) {
+  const pre = btn.closest(".code").querySelector("pre");
+  const text = pre.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.classList.add("copied");
+    const orig = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.classList.remove("copied"); btn.textContent = orig; }, 1500);
+  });
+}
+
+function toggleSolution(btn) {
+  const sol = btn.nextElementSibling;
+  sol.classList.toggle("visible");
+  btn.textContent = sol.classList.contains("visible") ? "Hide" : btn.textContent.replace(/Hide/, "Show");
+}
+
+renderNav();
+renderLesson();
+</script>
+
+</body>
+</html>

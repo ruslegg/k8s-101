@@ -1,0 +1,20 @@
+# BUG: this Service applies cleanly but has zero endpoints.
+# Run:
+#   kubectl apply -f broken-1.yaml
+#   kubectl get endpoints broken-one
+# The ENDPOINTS column will be "<none>".
+#
+# A Service is just a label query. If no pods match, the Service
+# routes to nowhere.
+#
+# Assume the Deployment from the parent folder is running (app=web).
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-one
+spec:
+  selector:
+    app: webserver       # but the Deployment's pods are labeled app=web
+  ports:
+    - port: 80
+      targetPort: 80

@@ -1,0 +1,26 @@
+# BUG: this Deployment will not even apply.
+# Run:
+#   kubectl apply -f broken-1.yaml
+# Read the error. The API server rejects Deployments whose selector
+# doesn't match the labels on the Pod template they would create.
+#
+# Find the mismatch and fix it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-one
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: broken-one
+  template:
+    metadata:
+      labels:
+        app: brokenone        # this label looks subtly different…
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80

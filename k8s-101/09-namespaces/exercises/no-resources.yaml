@@ -1,0 +1,23 @@
+# A deployment with no resource requests/limits.
+# Apply this to the `dev` namespace (after the quota is in place):
+#   kubectl apply -f no-resources.yaml -n dev
+#
+# Without a LimitRange providing defaults, pods are rejected because
+# the quota requires resource fields on every pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: greedy
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: greedy }
+  template:
+    metadata:
+      labels: { app: greedy }
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          ports:
+            - { containerPort: 80 }

@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probed
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: probed }
+  template:
+    metadata:
+      labels: { app: probed }
+    spec:
+      containers:
+        - name: app
+          # An image that exposes /healthz on :8080 — we use nginx and
+          # configure it via a ConfigMap (added separately to keep this
+          # file focused on the probe pattern).
+          image: nginx:alpine
+          ports:
+            - { containerPort: 80 }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 1
